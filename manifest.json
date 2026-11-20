@@ -1,0 +1,15 @@
+{
+  "name": "GameVault - Biblioteca de Jogos",
+  "short_name": "GameVault",
+  "description": "Gerencie sua biblioteca e histórico de jogos PS3, PS4, PS5 e PC",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["games", "entertainment", "utilities"]
+}

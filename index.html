@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameVault - Biblioteca de Jogos</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>🎮 GameVault</h1>
+    <p>Sua biblioteca e histórico de jogos</p>
+    <button id="install-btn" class="btn-install hidden">📲 Instalar App</button>
+  </header>
+
+  <main>
+    <!-- Backup / Restore -->
+    <section class="backup-section">
+      <h2>💾 Backup</h2>
+      <div class="backup-actions">
+        <button id="export-btn" class="btn-secondary">📤 Exportar JSON</button>
+        <label class="btn-secondary file-label">
+          📥 Importar JSON
+          <input type="file" id="import-input" accept=".json" hidden>
+        </label>
+        <span id="backup-status" class="backup-status"></span>
+      </div>
+    </section>
+
+    <!-- Gráficos -->
+    <section class="charts-section">
+      <h2>📊 Estatísticas Visuais</h2>
+      <div class="charts-grid">
+        <div class="chart-box">
+          <canvas id="chart-platforms"></canvas>
+        </div>
+        <div class="chart-box">
+          <canvas id="chart-status"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Formulário -->
+    <section class="form-section">
+      <h2 id="form-title">➕ Adicionar Jogo</h2>
+      <form id="game-form">
+        <input type="hidden" id="game-id">
+        
+        <div class="form-grid">
+          <div class="field">
+            <label for="title">Título *</label>
+            <div class="input-with-btn">
+              <input type="text" id="title" required placeholder="Ex: God of War">
+              <button type="button" id="fetch-cover-btn" title="Buscar capa no RAWG">🔍</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="platform">Plataforma *</label>
+            <select id="platform" required>
+              <option value="">Selecione...</option>
+              <option value="PS3">PS3</option>
+              <option value="PS4">PS4</option>
+              <option value="PS5">PS5</option>
+              <option value="PC">PC</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="genre">Gênero</label>
+            <input type="text" id="genre" placeholder="Ex: Ação, RPG...">
+          </div>
+
+          <div class="field">
+            <label for="status">Status *</label>
+            <select id="status" required>
+              <option value="Não iniciado">Não iniciado</option>
+              <option value="Jogando">Jogando</option>
+              <option value="Zerado">Zerado</option>
+              <option value="100%">100% / Platinado</option>
+              <option value="Abandonado">Abandonado</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="rating">Nota (0-10)</label>
+            <input type="number" id="rating" min="0" max="10" step="0.5" placeholder="8.5">
+          </div>
+
+          <div class="field">
+            <label for="hours">Horas jogadas</label>
+            <input type="number" id="hours" min="0" step="0.5" placeholder="0">
+          </div>
+
+          <div class="field full">
+            <label for="cover">URL da Capa</label>
+            <input type="url" id="cover" placeholder="https://... (ou use o botão 🔍)">
+          </div>
+
+          <div class="field full">
+            <label for="notes">Observações</label>
+            <textarea id="notes" rows="2" placeholder="Comentários, dicas, troféus..."></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Salvar Jogo</button>
+          <button type="button" id="cancel-edit" class="btn-secondary hidden">Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Filtros -->
+    <section class="filters">
+      <input type="search" id="search" placeholder="🔍 Buscar por título...">
+      <select id="filter-platform">
+        <option value="">Todas plataformas</option>
+        <option value="PS3">PS3</option>
+        <option value="PS4">PS4</option>
+        <option value="PS5">PS5</option>
+        <option value="PC">PC</option>
+      </select>
+      <select id="filter-status">
+        <option value="">Todos status</option>
+        <option value="Não iniciado">Não iniciado</option>
+        <option value="Jogando">Jogando</option>
+        <option value="Zerado">Zerado</option>
+        <option value="100%">100% / Platinado</option>
+        <option value="Abandonado">Abandonado</option>
+      </select>
+      <select id="sort-by">
+        <option value="added-desc">Mais recentes</option>
+        <option value="added-asc">Mais antigos</option>
+        <option value="title-asc">Título (A-Z)</option>
+        <option value="title-desc">Título (Z-A)</option>
+        <option value="rating-desc">Melhor nota</option>
+        <option value="hours-desc">Mais horas</option>
+      </select>
+    </section>
+
+    <!-- Estatísticas -->
+    <section class="stats" id="stats"></section>
+
+    <!-- Lista de Jogos -->
+    <section class="games-section">
+      <h2>📚 Biblioteca <span id="game-count"></span></h2>
+      <div id="games-list" class="games-grid"></div>
+      <p id="empty-msg" class="empty-msg">Nenhum jogo cadastrado ainda. Adicione seu primeiro jogo! 🎮</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
