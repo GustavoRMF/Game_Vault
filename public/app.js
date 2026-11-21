@@ -153,9 +153,14 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     saveSession(data.token, data.user);
     document.getElementById('auth-form').reset();
     updateAuthUI();
-    await Promise.all([loadGames(), loadWishlist()]);
+
+    await loadGames();
     render();
-    renderWishlist();
+    if (typeof loadWishlist === 'function') {
+      await loadWishlist();
+      renderWishlist();
+    }
+
     showToast(authMode === 'login' ? `Bem-vindo de volta, ${data.user.username}!` : `Conta criada! Bem-vindo, ${data.user.username}!`);
   } catch (err) {
     showToast(err.message);
@@ -194,9 +199,14 @@ document.getElementById('forgot-form').addEventListener('submit', async (e) => {
     document.getElementById('forgot-form').reset();
     switchAuthMode('login');
     updateAuthUI();
-    await Promise.all([loadGames(), loadWishlist()]);
+
+    await loadGames();
     render();
-    renderWishlist();
+    if (typeof loadWishlist === 'function') {
+      await loadWishlist();
+      renderWishlist();
+    }
+
     showToast(`Senha redefinida com sucesso! Bem-vindo, ${data.user.username}!`);
   } catch (err) {
     showToast(err.message);
@@ -889,8 +899,11 @@ window.addEventListener('appinstalled', () => {
   loadSession();
   updateAuthUI();
   if (authToken && currentUser) {
-    await Promise.all([loadGames(), loadWishlist()]);
+    await loadGames();
     render();
-    renderWishlist();
+    if (typeof loadWishlist === 'function') {
+      await loadWishlist();
+      renderWishlist();
+    }
   }
 })();
