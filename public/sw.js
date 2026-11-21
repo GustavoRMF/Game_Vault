@@ -1,4 +1,4 @@
-const CACHE = 'gamevault-v7';
+const CACHE = 'gamevault-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -32,7 +32,14 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Network-First: sempre busca a versão mais nova no Render e atualiza o cache
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
