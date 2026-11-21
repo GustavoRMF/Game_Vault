@@ -1,27 +1,23 @@
 // ========================================
-// GameVault - Gerenciador de Biblioteca (v2)
+// GameVault - Gerenciador de Biblioteca (Cloud + 3D)
 // ========================================
-
-const STORAGE_KEY = 'gamevault_games';
-const RAWG_API_KEY = 'SUA_CHAVE_RAWG_AQUI'; // Obtenha em https://rawg.io/apidocs
 
 let games = [];
 let editingId = null;
 let deferredPrompt = null;
 let charts = { platforms: null, status: null };
 
-// ===== Persistência =====
-function loadGames() {
+// ===== Persistência (API + PostgreSQL Neon) =====
+async function loadGames() {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    games = data ? JSON.parse(data) : [];
+    const res = await fetch('/api/games');
+    if (!res.ok) throw new Error('Falha ao carregar biblioteca');
+    games = await res.json();
   } catch (e) {
+    console.error(e);
+    showToast('Erro ao conectar com o servidor.');
     games = [];
   }
-}
-
-function saveGames() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
 }
 
 // ===== Helpers =====
@@ -61,27 +57,43 @@ function showToast(msg) {
 }
 
 // ===== CRUD =====
-function addGame(data) {
+async function addGame(data) {
   const game = { id: generateId(), ...data, addedAt: Date.now() };
-  games.push(game);
-  saveGames();
+  const res = await fetch('/api/games', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(game)
+  });
+  if (!res.ok) throw new Error('Erro ao salvar');
+  games.unshift(game);
   return game;
 }
 
-function updateGame(id, data) {
+async function updateGame(id, data) {
   const idx = games.findIndex(g => g.id === id);
   if (idx === -1) return false;
+  const res = await fetch(`/api/games/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Erro ao atualizar');
   games[idx] = { ...games[idx], ...data };
-  saveGames();
   return true;
 }
 
-function deleteGame(id) {
+async function deleteGame(id) {
   if (!confirm('Excluir este jogo?')) return;
-  games = games.filter(g => g.id !== id);
-  if (editingId === id) resetForm();
-  saveGames();
-  render();
+  try {
+    const res = await fetch(`/api/games/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Erro ao excluir');
+    games = games.filter(g => g.id !== id);
+    if (editingId === id) resetForm();
+    render();
+    showToast('Jogo excluído.');
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 function getGame(id) {
@@ -106,26 +118,30 @@ function exportBackup() {
 
 function importBackup(file) {
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('Formato inválido');
       const valid = imported.filter(g => g && typeof g.id === 'string' && g.title && g.platform);
       if (valid.length === 0) throw new Error('Nenhum jogo válido');
 
-      const existingIds = new Set(games.map(g => g.id));
-      const novos = valid.filter(g => !existingIds.has(g.id));
+      const res = await fetch('/api/games/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(valid)
+      });
+      if (!res.ok) throw new Error('Falha ao importar no servidor');
+      const { imported: count } = await res.json();
 
-      if (novos.length === 0) {
+      if (count === 0) {
         showToast('Todos os jogos já existem.');
         return;
       }
 
-      games = [...games, ...novos];
-      saveGames();
+      await loadGames();
       render();
-      document.getElementById('backup-status').textContent = `✅ ${novos.length} jogo(s) importado(s)`;
-      showToast(`${novos.length} jogo(s) importado(s)!`);
+      document.getElementById('backup-status').textContent = `✅ ${count} jogo(s) importado(s)`;
+      showToast(`${count} jogo(s) importado(s)!`);
     } catch (err) {
       showToast('Erro ao importar: ' + err.message);
     }
@@ -133,14 +149,10 @@ function importBackup(file) {
   reader.readAsText(file);
 }
 
-// ===== RAWG API (capas) =====
+// ===== RAWG API (via backend) =====
 async function fetchCover(title) {
   if (!title.trim()) {
     showToast('Digite um título primeiro.');
-    return;
-  }
-  if (RAWG_API_KEY === 'SUA_CHAVE_RAWG_AQUI') {
-    showToast('Configure sua chave RAWG em app.js');
     return;
   }
 
@@ -149,19 +161,15 @@ async function fetchCover(title) {
   btn.textContent = '⏳';
 
   try {
-    const res = await fetch(`https://api.rawg.io/api/games?search=${encodeURIComponent(title)}&key=${RAWG_API_KEY}&page_size=1`);
-    if (!res.ok) throw new Error('Erro na API');
+    const res = await fetch(`/api/cover?title=${encodeURIComponent(title)}`);
     const data = await res.json();
-    if (data.results && data.results.length > 0) {
-      const img = data.results[0].background_image;
-      if (img) {
-        document.getElementById('cover').value = img;
-        showToast('Capa encontrada!');
-      } else {
-        showToast('Jogo encontrado, mas sem capa.');
-      }
+    if (!res.ok) throw new Error(data.error || 'Erro na API');
+
+    if (data.cover) {
+      document.getElementById('cover').value = data.cover;
+      showToast('Capa encontrada!');
     } else {
-      showToast('Jogo não encontrado no RAWG.');
+      showToast('Jogo não encontrado ou sem capa.');
     }
   } catch (e) {
     showToast('Erro ao buscar capa: ' + e.message);
@@ -354,19 +362,29 @@ function startEdit(id) {
 }
 
 // ===== Eventos =====
-document.getElementById('game-form').addEventListener('submit', (e) => {
+document.getElementById('game-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = getFormData();
   if (!data.title || !data.platform || !data.status) return;
-  if (editingId) {
-    updateGame(editingId, data);
-    showToast('Jogo atualizado!');
-  } else {
-    addGame(data);
-    showToast('Jogo adicionado!');
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+
+  try {
+    if (editingId) {
+      await updateGame(editingId, data);
+      showToast('Jogo atualizado!');
+    } else {
+      await addGame(data);
+      showToast('Jogo adicionado!');
+    }
+    resetForm();
+    render();
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    submitBtn.disabled = false;
   }
-  resetForm();
-  render();
 });
 
 document.getElementById('games-list').addEventListener('click', (e) => {
@@ -390,6 +408,34 @@ document.getElementById('fetch-cover-btn').addEventListener('click', () => {
 document.getElementById('search').addEventListener('input', renderGames);
 ['filter-platform', 'filter-status', 'sort-by'].forEach(id => {
   document.getElementById(id).addEventListener('change', renderGames);
+});
+
+// ===== Efeito 3D Tilt nos Cards =====
+const gamesListEl = document.getElementById('games-list');
+
+gamesListEl.addEventListener('mousemove', (e) => {
+  const card = e.target.closest('.game-card');
+  if (!card) return;
+
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  card.style.setProperty('--mouse-x', `${x}px`);
+  card.style.setProperty('--mouse-y', `${y}px`);
+
+  const rotateY = ((x / rect.width) - 0.5) * 14;
+  const rotateX = ((y / rect.height) - 0.5) * -14;
+
+  card.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-4px)`;
+});
+
+gamesListEl.addEventListener('mouseout', (e) => {
+  const card = e.target.closest('.game-card');
+  if (!card) return;
+  if (!card.contains(e.relatedTarget)) {
+    card.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0)';
+  }
 });
 
 // ===== PWA / Service Worker =====
@@ -421,36 +467,8 @@ window.addEventListener('appinstalled', () => {
   document.getElementById('install-btn').classList.add('hidden');
 });
 
-// ===== Efeito 3D Tilt nos Cards =====
-const gamesListEl = document.getElementById('games-list');
-
-gamesListEl.addEventListener('mousemove', (e) => {
-  const card = e.target.closest('.game-card');
-  if (!card) return;
-
-  const rect = card.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  // Atualiza posição do reflexo de luz
-  card.style.setProperty('--mouse-x', `${x}px`);
-  card.style.setProperty('--mouse-y', `${y}px`);
-
-  // Calcula inclinação 3D suave (máximo de 7 graus)
-  const rotateY = ((x / rect.width) - 0.5) * 14;
-  const rotateX = ((y / rect.height) - 0.5) * -14;
-
-  card.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-4px)`;
-});
-
-gamesListEl.addEventListener('mouseout', (e) => {
-  const card = e.target.closest('.game-card');
-  if (!card) return;
-  if (!card.contains(e.relatedTarget)) {
-    card.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0)';
-  }
-});
-
 // ===== Init =====
-loadGames();
-render();
+(async () => {
+  await loadGames();
+  render();
+})();

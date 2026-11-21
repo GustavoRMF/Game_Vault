@@ -1,4 +1,4 @@
-const CACHE = 'gamevault-v2';
+const CACHE = 'gamevault-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -25,12 +25,14 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.url.includes('api.rawg.io')) {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
-    );
+  const url = new URL(e.request.url);
+
+  // Nunca faz cache de requisições da API (/api/games, /api/cover)
+  if (url.pathname.startsWith('/api/')) {
+    e.respondWith(fetch(e.request));
     return;
   }
+
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
