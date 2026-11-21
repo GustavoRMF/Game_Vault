@@ -15,16 +15,16 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ===== Criptografia e Tokens (Nativo do Node.js) =====
-function hashPassword(password) {
+function hashSecret(value) {
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  const hash = crypto.scryptSync(value, salt, 64).toString('hex');
   return `${salt}:${hash}`;
 }
 
-function verifyPassword(password, stored) {
+function verifySecret(value, stored) {
   if (!stored || !stored.includes(':')) return false;
   const [salt, key] = stored.split(':');
-  const hashBuffer = crypto.scryptSync(password, salt, 64);
+  const hashBuffer = crypto.scryptSync(value, salt, 64);
   const keyBuffer = Buffer.from(key, 'hex');
   if (hashBuffer.length !== keyBuffer.length) return false;
   return crypto.timingSafeEqual(hashBuffer, keyBuffer);
@@ -66,9 +66,12 @@ async function initDB() {
       id VARCHAR(64) PRIMARY KEY,
       username VARCHAR(40) UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      recovery_hint_hash TEXT,
       created_at BIGINT NOT NULL
     );
   `);
+
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_hint_hash TEXT;`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS games (
@@ -95,19 +98,26 @@ app.post('/api/auth/register', async (req, res) => {
   const username = (req.body.username || '').trim();
   const password = req.body.password || '';
 
-  if (username.length < 3) return res.status(400).json({ error: 'Usuário deve ter pelo menos 3 caracteres.' });
-  if (password.length < 4) return res.status(400).json({ error: 'Senha deve ter pelo menos 4 caracteres.' });
+  if (username.length < 3) {
+    return res.status(400).json({ error: 'O nome de usuário deve ter pelo menos 3 caracteres.' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'A senha deve ter no mínimo 8 dígitos/caracteres.' });
+  }
 
   try {
     const exists = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-    if (exists.rowCount > 0) return res.status(409).json({ error: 'Este nome de usuário já está em uso.' });
+    if (exists.rowCount > 0) {
+      return res.status(409).json({ error: 'Este nome de usuário já está em uso.' });
+    }
 
     const userId = Date.now().toString(36) + crypto.randomBytes(4).toString('hex');
-    const passwordHash = hashPassword(password);
+    const passwordHash = hashSecret(password);
+    const firstThreeHash = hashSecret(password.slice(0, 3));
 
     await pool.query(
-      'INSERT INTO users (id, username, password_hash, created_at) VALUES ($1, $2, $3, $4)',
-      [userId, username, passwordHash, Date.now()]
+      'INSERT INTO users (id, username, password_hash, recovery_hint_hash, created_at) VALUES ($1, $2, $3, $4, $5)',
+      [userId, username, passwordHash, firstThreeHash, Date.now()]
     );
 
     // Vincula jogos antigos sem dono ao primeiro usuário cadastrado
@@ -128,7 +138,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
     const user = rows[0];
-    if (!user || !verifyPassword(password, user.password_hash)) {
+    if (!user || !verifySecret(password, user.password_hash)) {
       return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
     }
 
@@ -139,6 +149,47 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error('Erro login:', err);
     res.status(500).json({ error: 'Erro ao fazer login.' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const username = (req.body.username || '').trim();
+  const firstThree = req.body.firstThree || '';
+  const newPassword = req.body.newPassword || '';
+
+  if (!username) {
+    return res.status(400).json({ error: 'Informe o nome de usuário.' });
+  }
+  if (firstThree.length !== 3) {
+    return res.status(400).json({ error: 'Informe exatamente os 3 primeiros dígitos da senha cadastrada.' });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'A nova senha deve ter no mínimo 8 dígitos/caracteres.' });
+  }
+
+  try {
+    const { rows } = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+    const user = rows[0];
+
+    if (!user || !user.recovery_hint_hash || !verifySecret(firstThree, user.recovery_hint_hash)) {
+      return res.status(401).json({ error: 'Usuário não encontrado ou os 3 primeiros dígitos estão incorretos.' });
+    }
+
+    const newPasswordHash = hashSecret(newPassword);
+    const newFirstThreeHash = hashSecret(newPassword.slice(0, 3));
+
+    await pool.query(
+      'UPDATE users SET password_hash = $1, recovery_hint_hash = $2 WHERE id = $3',
+      [newPasswordHash, newFirstThreeHash, user.id]
+    );
+
+    res.json({
+      token: createToken({ id: user.id, username: user.username }),
+      user: { id: user.id, username: user.username }
+    });
+  } catch (err) {
+    console.error('Erro reset-password:', err);
+    res.status(500).json({ error: 'Erro ao redefinir a senha.' });
   }
 });
 

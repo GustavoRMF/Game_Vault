@@ -32,30 +32,68 @@
   </header>
 
   <main>
-    <!-- ==================== TELA DE LOGIN / CADASTRO ==================== -->
-    <section id="auth-section" class="auth-card">
-      <div class="auth-tabs">
-        <button type="button" class="auth-tab-btn active" data-auth="login">🔑 Entrar</button>
-        <button type="button" class="auth-tab-btn" data-auth="register">✨ Criar Conta</button>
-      </div>
+    <!-- ==================== TELA DE LOGIN / CADASTRO 3D GAMER ==================== -->
+    <div id="auth-wrapper" class="auth-3d-stage">
+      <section id="auth-section" class="auth-card gamer-3d-panel">
+        <div class="gamer-glow-ring"></div>
+        <div class="auth-panel-inner">
+          <div class="auth-tabs">
+            <button type="button" class="auth-tab-btn active" data-auth="login">🔑 Entrar</button>
+            <button type="button" class="auth-tab-btn" data-auth="register">✨ Criar Conta</button>
+          </div>
 
-      <h2 id="auth-title">Entrar no GameVault</h2>
-      <p id="auth-subtitle" class="settings-desc">Acesse sua biblioteca e dispute o topo do ranking de horas jogadas.</p>
+          <h2 id="auth-title">Entrar no GameVault</h2>
+          <p id="auth-subtitle" class="settings-desc">Acesse sua biblioteca e dispute o topo do ranking de horas jogadas.</p>
 
-      <form id="auth-form" class="auth-form">
-        <div class="field">
-          <label for="auth-username">Nome de Usuário (Gamertag)</label>
-          <input type="text" id="auth-username" required minlength="3" maxlength="30" placeholder="Ex: GustavoGamer">
+          <!-- Formulário Principal (Login / Cadastro) -->
+          <form id="auth-form" class="auth-form">
+            <div class="field">
+              <label for="auth-username">Nome de Usuário</label>
+              <input type="text" id="auth-username" required minlength="3" maxlength="30" placeholder="Ex: Nome">
+            </div>
+
+            <div class="field">
+              <label for="auth-password">Senha <span id="password-rule-badge" class="rule-hint hidden">(mín. 8 dígitos)</span></label>
+              <input type="password" id="auth-password" required minlength="8" placeholder="Mínimo 8 dígitos">
+            </div>
+
+            <div id="register-tip" class="security-tip hidden">
+              🛡️ <strong>Dica de Segurança:</strong> Guarde bem os <strong>3 primeiros dígitos</strong> da sua senha. Você precisará deles caso esqueça a senha!
+            </div>
+
+            <button type="submit" id="auth-submit-btn" class="btn-primary full-btn gamer-btn-pulse">Entrar na Conta</button>
+
+            <div id="forgot-link-box" class="forgot-box">
+              <button type="button" id="open-forgot-btn" class="btn-link">🔓 Esqueceu a senha?</button>
+            </div>
+          </form>
+
+          <!-- Formulário de Recuperação de Senha -->
+          <form id="forgot-form" class="auth-form hidden">
+            <div class="field">
+              <label for="forgot-username">Nome de Usuário</label>
+              <input type="text" id="forgot-username" required minlength="3" maxlength="30" placeholder="Ex: Nome">
+            </div>
+
+            <div class="field">
+              <label for="forgot-first-three">3 primeiros dígitos da senha cadastrada</label>
+              <input type="text" id="forgot-first-three" required minlength="3" maxlength="3" placeholder="Ex: 123 ou abc">
+            </div>
+
+            <div class="field">
+              <label for="forgot-new-password">Nova Senha (mín. 8 dígitos)</label>
+              <input type="password" id="forgot-new-password" required minlength="8" placeholder="Digite a nova senha">
+            </div>
+
+            <button type="submit" id="forgot-submit-btn" class="btn-primary full-btn">Redefinir Senha e Entrar</button>
+
+            <div class="forgot-box">
+              <button type="button" id="back-to-login-btn" class="btn-link">← Voltar para o Login</button>
+            </div>
+          </form>
         </div>
-
-        <div class="field">
-          <label for="auth-password">Senha</label>
-          <input type="password" id="auth-password" required minlength="4" placeholder="••••••••">
-        </div>
-
-        <button type="submit" id="auth-submit-btn" class="btn-primary full-btn">Entrar na Conta</button>
-      </form>
-    </section>
+      </section>
+    </div>
 
     <!-- ==================== CONTEÚDO LOGADO ==================== -->
     <div id="app-content" class="hidden">
@@ -217,7 +255,7 @@
             Seus dados estão vinculados à sua conta na nuvem com PostgreSQL (Neon) e capas integradas via IGDB.
           </p>
           <div class="settings-meta">
-            <span class="badge">Versão 3.0 (Multi-User + Ranking 3D)</span>
+            <span class="badge">Versão 3.1 (Auth 3D Gamer + Ranking)</span>
             <span class="badge status-Jogando">● Banco Online</span>
           </div>
         </section>

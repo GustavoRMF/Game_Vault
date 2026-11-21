@@ -1,4 +1,4 @@
-const CACHE = 'gamevault-v5';
+const CACHE = 'gamevault-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -27,7 +27,6 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // Nunca faz cache de requisições da API (/api/auth, /api/games, /api/ranking, /api/cover)
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(fetch(e.request));
     return;

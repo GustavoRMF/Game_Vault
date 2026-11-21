@@ -1,7 +1,7 @@
 {
   "name": "gamevault",
-  "version": "3.0.0",
-  "description": "Gerenciador de biblioteca de jogos multi-usuário com PostgreSQL e Ranking 3D",
+  "version": "3.1.0",
+  "description": "Gerenciador de biblioteca de jogos multi-usuário com PostgreSQL, Auth 3D e Ranking",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

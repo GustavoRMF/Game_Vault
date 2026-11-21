@@ -1,12 +1,12 @@
 // ========================================
-// GameVault - Gerenciador de Biblioteca & Ranking (Multi-User + 3D)
+// GameVault - Gerenciador de Biblioteca & Ranking (Multi-User + 3D Gamer)
 // ========================================
 
 let games = [];
 let editingId = null;
 let deferredPrompt = null;
 let charts = { platforms: null, status: null };
-let authMode = 'login'; // 'login' | 'register'
+let authMode = 'login'; // 'login' | 'register' | 'forgot'
 let currentUser = null;
 let authToken = null;
 
@@ -53,17 +53,17 @@ async function apiFetch(url, options = {}) {
 }
 
 function updateAuthUI() {
-  const authSection = document.getElementById('auth-section');
+  const authWrapper = document.getElementById('auth-wrapper');
   const appContent = document.getElementById('app-content');
   const userBar = document.getElementById('user-bar');
 
   if (authToken && currentUser) {
-    authSection.classList.add('hidden');
+    authWrapper.classList.add('hidden');
     appContent.classList.remove('hidden');
     userBar.classList.remove('hidden');
     document.getElementById('current-username').textContent = currentUser.username;
   } else {
-    authSection.classList.remove('hidden');
+    authWrapper.classList.remove('hidden');
     appContent.classList.add('hidden');
     userBar.classList.add('hidden');
   }
@@ -71,6 +71,7 @@ function updateAuthUI() {
 
 function switchAuthMode(mode) {
   authMode = mode;
+
   document.querySelectorAll('.auth-tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.auth === mode);
   });
@@ -78,15 +79,37 @@ function switchAuthMode(mode) {
   const titleEl = document.getElementById('auth-title');
   const subEl = document.getElementById('auth-subtitle');
   const submitBtn = document.getElementById('auth-submit-btn');
+  const authForm = document.getElementById('auth-form');
+  const forgotForm = document.getElementById('forgot-form');
+  const ruleBadge = document.getElementById('password-rule-badge');
+  const registerTip = document.getElementById('register-tip');
+  const forgotLinkBox = document.getElementById('forgot-link-box');
+
+  if (mode === 'forgot') {
+    authForm.classList.add('hidden');
+    forgotForm.classList.remove('hidden');
+    titleEl.textContent = 'Recuperar Senha';
+    subEl.textContent = 'Informe seu usuário e os 3 primeiros dígitos da senha cadastrada para criar uma nova.';
+    return;
+  }
+
+  forgotForm.classList.add('hidden');
+  authForm.classList.remove('hidden');
 
   if (mode === 'login') {
     titleEl.textContent = 'Entrar no GameVault';
     subEl.textContent = 'Acesse sua biblioteca e dispute o topo do ranking de horas jogadas.';
     submitBtn.textContent = 'Entrar na Conta';
+    ruleBadge.classList.add('hidden');
+    registerTip.classList.add('hidden');
+    forgotLinkBox.classList.remove('hidden');
   } else {
     titleEl.textContent = 'Criar Nova Conta';
-    subEl.textContent = 'Cadastre sua Gamertag para salvar seus jogos e competir no ranking.';
+    subEl.textContent = 'Cadastre seu usuário com uma senha de no mínimo 8 dígitos.';
     submitBtn.textContent = 'Cadastrar e Entrar';
+    ruleBadge.classList.remove('hidden');
+    registerTip.classList.remove('hidden');
+    forgotLinkBox.add('hidden');
   }
 }
 
@@ -94,11 +117,26 @@ document.querySelectorAll('.auth-tab-btn').forEach(btn => {
   btn.addEventListener('click', () => switchAuthMode(btn.dataset.auth));
 });
 
+document.getElementById('open-forgot-btn').addEventListener('click', () => {
+  const typedUser = document.getElementById('auth-username').value.trim();
+  if (typedUser) document.getElementById('forgot-username').value = typedUser;
+  switchAuthMode('forgot');
+});
+
+document.getElementById('back-to-login-btn').addEventListener('click', () => {
+  switchAuthMode('login');
+});
+
 document.getElementById('auth-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const username = document.getElementById('auth-username').value.trim();
   const password = document.getElementById('auth-password').value;
   const submitBtn = document.getElementById('auth-submit-btn');
+
+  if (authMode === 'register' && password.length < 8) {
+    showToast('A senha deve ter no mínimo 8 dígitos.');
+    return;
+  }
 
   submitBtn.disabled = true;
   try {
@@ -124,12 +162,76 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
   }
 });
 
+document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('forgot-username').value.trim();
+  const firstThree = document.getElementById('forgot-first-three').value;
+  const newPassword = document.getElementById('forgot-new-password').value;
+  const submitBtn = document.getElementById('forgot-submit-btn');
+
+  if (firstThree.length !== 3) {
+    showToast('Digite exatamente os 3 primeiros dígitos da senha cadastrada.');
+    return;
+  }
+  if (newPassword.length < 8) {
+    showToast('A nova senha deve ter no mínimo 8 dígitos.');
+    return;
+  }
+
+  submitBtn.disabled = true;
+  try {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, firstThree, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro ao redefinir senha');
+
+    saveSession(data.token, data.user);
+    document.getElementById('forgot-form').reset();
+    switchAuthMode('login');
+    updateAuthUI();
+    await loadGames();
+    render();
+    showToast(`Senha redefinida com sucesso! Bem-vindo, ${data.user.username}!`);
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
 document.getElementById('logout-btn').addEventListener('click', () => {
   clearSession();
   resetForm();
+  switchAuthMode('login');
   updateAuthUI();
   showToast('Você saiu da conta.');
 });
+
+// ===== Efeito 3D Interativo no Painel de Login/Cadastro =====
+const authStage = document.getElementById('auth-wrapper');
+const authPanel = document.getElementById('auth-section');
+
+if (authStage && authPanel) {
+  authStage.addEventListener('mousemove', (e) => {
+    const rect = authPanel.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    authPanel.style.setProperty('--mouse-x', `${x}px`);
+    authPanel.style.setProperty('--mouse-y', `${y}px`);
+
+    const rotateY = ((x / rect.width) - 0.5) * 10;
+    const rotateX = ((y / rect.height) - 0.5) * -10;
+    authPanel.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+  });
+
+  authStage.addEventListener('mouseleave', () => {
+    authPanel.style.transform = 'rotateX(0deg) rotateY(0deg)';
+  });
+}
 
 // ===== Persistência (API + PostgreSQL Neon) =====
 async function loadGames() {
@@ -245,7 +347,7 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.remove('hidden');
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.add('hidden'), 3000);
+  t._timer = setTimeout(() => t.classList.add('hidden'), 3200);
 }
 
 // ===== CRUD =====
