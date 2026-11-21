@@ -90,6 +90,22 @@ async function initDB() {
   `);
 
   await pool.query(`ALTER TABLE games ADD COLUMN IF NOT EXISTS user_id VARCHAR(64);`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS wishlist (
+      id VARCHAR(64) PRIMARY KEY,
+      user_id VARCHAR(64) NOT NULL,
+      title TEXT NOT NULL,
+      platform VARCHAR(20) NOT NULL,
+      genre TEXT,
+      priority VARCHAR(20) NOT NULL DEFAULT 'Média',
+      target_price NUMERIC(10, 2),
+      cover TEXT,
+      notes TEXT,
+      added_at BIGINT NOT NULL
+    );
+  `);
+
   console.log('Banco de dados Neon conectado e tabelas verificadas.');
 }
 
@@ -120,7 +136,6 @@ app.post('/api/auth/register', async (req, res) => {
       [userId, username, passwordHash, firstThreeHash, Date.now()]
     );
 
-    // Vincula jogos antigos sem dono ao primeiro usuário cadastrado
     await pool.query('UPDATE games SET user_id = $1 WHERE user_id IS NULL', [userId]);
 
     const user = { id: userId, username };
@@ -216,7 +231,7 @@ app.get('/api/ranking', authMiddleware, async (req, res) => {
   }
 });
 
-// ===== Rotas de Jogos =====
+// ===== Rotas de Jogos (Biblioteca) =====
 app.get('/api/games', authMiddleware, async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -310,6 +325,119 @@ app.delete('/api/games/:id', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Erro DELETE games:', err);
     res.status(500).json({ error: 'Erro ao excluir jogo' });
+  }
+});
+
+// ===== Rotas de Lista de Desejos (Wishlist) =====
+app.get('/api/wishlist', authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM wishlist WHERE user_id = $1 ORDER BY added_at DESC',
+      [req.user.id]
+    );
+    const formatted = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      platform: r.platform,
+      genre: r.genre || '',
+      priority: r.priority || 'Média',
+      targetPrice: r.target_price !== null ? parseFloat(r.target_price) : null,
+      cover: r.cover || '',
+      notes: r.notes || '',
+      addedAt: Number(r.added_at)
+    }));
+    res.json(formatted);
+  } catch (err) {
+    console.error('Erro GET wishlist:', err);
+    res.status(500).json({ error: 'Erro ao buscar lista de desejos' });
+  }
+});
+
+app.post('/api/wishlist', authMiddleware, async (req, res) => {
+  const { id, title, platform, genre, priority, targetPrice, cover, notes, addedAt } = req.body;
+  if (!id || !title || !platform) {
+    return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+  }
+  try {
+    const safeId = id.startsWith(`${req.user.id}_`) ? id : `${req.user.id}_${id}`;
+    await pool.query(
+      `INSERT INTO wishlist (id, user_id, title, platform, genre, priority, target_price, cover, notes, added_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [safeId, req.user.id, title, platform, genre || '', priority || 'Média', targetPrice ?? null, cover || '', notes || '', addedAt || Date.now()]
+    );
+    res.status(201).json({ ok: true, id: safeId });
+  } catch (err) {
+    console.error('Erro POST wishlist:', err);
+    res.status(500).json({ error: 'Erro ao salvar na lista de desejos' });
+  }
+});
+
+app.put('/api/wishlist/:id', authMiddleware, async (req, res) => {
+  const { title, platform, genre, priority, targetPrice, cover, notes } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE wishlist
+       SET title = $1, platform = $2, genre = $3, priority = $4, target_price = $5, cover = $6, notes = $7
+       WHERE id = $8 AND user_id = $9`,
+      [title, platform, genre || '', priority || 'Média', targetPrice ?? null, cover || '', notes || '', req.params.id, req.user.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Item não encontrado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro PUT wishlist:', err);
+    res.status(500).json({ error: 'Erro ao atualizar desejo' });
+  }
+});
+
+app.delete('/api/wishlist/:id', authMiddleware, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM wishlist WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro DELETE wishlist:', err);
+    res.status(500).json({ error: 'Erro ao remover da lista de desejos' });
+  }
+});
+
+// Move o item da Lista de Desejos direto para a Biblioteca
+app.post('/api/wishlist/:id/move-to-library', authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM wishlist WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    const item = rows[0];
+    if (!item) return res.status(404).json({ error: 'Jogo não encontrado na lista de desejos' });
+
+    const newGameId = `${req.user.id}_${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`;
+    const addedAt = Date.now();
+
+    await pool.query(
+      `INSERT INTO games (id, user_id, title, platform, genre, status, rating, hours, cover, notes, added_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [newGameId, req.user.id, item.title, item.platform, item.genre || '', 'Não iniciado', null, 0, item.cover || '', item.notes || '', addedAt]
+    );
+
+    await pool.query('DELETE FROM wishlist WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+
+    res.json({
+      ok: true,
+      game: {
+        id: newGameId,
+        title: item.title,
+        platform: item.platform,
+        genre: item.genre || '',
+        status: 'Não iniciado',
+        rating: null,
+        hours: 0,
+        cover: item.cover || '',
+        notes: item.notes || '',
+        addedAt
+      }
+    });
+  } catch (err) {
+    console.error('Erro move-to-library:', err);
+    res.status(500).json({ error: 'Erro ao mover jogo para a biblioteca' });
   }
 });
 

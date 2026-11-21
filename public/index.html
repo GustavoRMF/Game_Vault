@@ -25,6 +25,7 @@
 
       <nav class="tabs-nav">
         <button type="button" class="tab-btn active" data-tab="library">🎮 Biblioteca</button>
+        <button type="button" class="tab-btn" data-tab="wishlist">⭐ Desejos</button>
         <button type="button" class="tab-btn" data-tab="ranking">🏆 Ranking</button>
         <button type="button" class="tab-btn" data-tab="settings">⚙️ Configurações</button>
       </nav>
@@ -214,7 +215,98 @@
         </section>
       </div>
 
-      <!-- ABA 2: RANKING / COMPETIÇÃO -->
+      <!-- ABA 2: LISTA DE DESEJOS (WISHLIST) -->
+      <div id="tab-wishlist" class="tab-content hidden">
+        <section class="form-section" id="wish-form-section">
+          <h2 id="wish-form-title">⭐ Adicionar à Lista de Desejos</h2>
+          <form id="wish-form">
+            <input type="hidden" id="wish-id">
+
+            <div class="form-grid">
+              <div class="field autocomplete-wrapper">
+                <label for="wish-title">Título *</label>
+                <div class="input-with-btn">
+                  <input type="text" id="wish-title" required autocomplete="off" placeholder="Digite o jogo desejado...">
+                  <button type="button" id="wish-fetch-cover-btn" title="Buscar capa automaticamente">🔍</button>
+                </div>
+                <div id="wish-suggestions" class="suggestions-dropdown hidden"></div>
+              </div>
+
+              <div class="field">
+                <label for="wish-platform">Plataforma *</label>
+                <select id="wish-platform" required>
+                  <option value="">Selecione...</option>
+                  <option value="PS3">PS3</option>
+                  <option value="PS4">PS4</option>
+                  <option value="PS5">PS5</option>
+                  <option value="PC">PC</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="wish-genre">Gênero</label>
+                <input type="text" id="wish-genre" placeholder="Ex: Ação, RPG...">
+              </div>
+
+              <div class="field">
+                <label for="wish-priority">Prioridade *</label>
+                <select id="wish-priority" required>
+                  <option value="Alta">🔥 Alta (Comprar logo)</option>
+                  <option value="Média" selected>⭐ Média</option>
+                  <option value="Baixa">❄️ Baixa (Esperar promoção)</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="wish-price">Preço Alvo (R$)</label>
+                <input type="number" id="wish-price" min="0" step="0.01" placeholder="Ex: 149.90">
+              </div>
+
+              <div class="field">
+                <label for="wish-cover">URL da Capa</label>
+                <input type="url" id="wish-cover" placeholder="https://... (ou use o botão 🔍)">
+              </div>
+
+              <div class="field full">
+                <label for="wish-notes">Observações / Onde comprar</label>
+                <textarea id="wish-notes" rows="2" placeholder="Ex: Esperar promoção na PSN / Steam, edição deluxe..."></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Salvar na Lista de Desejos</button>
+              <button type="button" id="wish-cancel-edit" class="btn-secondary hidden">Cancelar</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="filters wish-filters">
+          <input type="search" id="wish-search" placeholder="🔍 Filtrar desejos por título...">
+          <select id="wish-filter-platform">
+            <option value="">Todas plataformas</option>
+            <option value="PS3">PS3</option>
+            <option value="PS4">PS4</option>
+            <option value="PS5">PS5</option>
+            <option value="PC">PC</option>
+          </select>
+          <select id="wish-filter-priority">
+            <option value="">Todas prioridades</option>
+            <option value="Alta">🔥 Alta</option>
+            <option value="Média">⭐ Média</option>
+            <option value="Baixa">❄️ Baixa</option>
+          </select>
+        </section>
+
+        <section class="stats" id="wish-stats"></section>
+
+        <section class="games-section">
+          <h2>⭐ Meus Desejos <span id="wish-count"></span></h2>
+          <div id="wish-list" class="games-grid"></div>
+          <p id="wish-empty-msg" class="empty-msg">Sua lista de desejos está vazia. Adicione os próximos jogos que você quer jogar! ⭐</p>
+        </section>
+      </div>
+
+      <!-- ABA 3: RANKING / COMPETIÇÃO -->
       <div id="tab-ranking" class="tab-content hidden">
         <section class="ranking-section">
           <div class="ranking-header">
@@ -233,7 +325,7 @@
         </section>
       </div>
 
-      <!-- ABA 3: CONFIGURAÇÕES -->
+      <!-- ABA 4: CONFIGURAÇÕES -->
       <div id="tab-settings" class="tab-content hidden">
         <section class="backup-section">
           <h2>💾 Backup e Restauração</h2>
@@ -256,7 +348,7 @@
             Seus dados estão vinculados à sua conta na nuvem com PostgreSQL (Neon) e capas integradas via IGDB.
           </p>
           <div class="settings-meta">
-            <span class="badge">Versão 3.1 (Auth 3D Gamer + Ranking)</span>
+            <span class="badge">Versão 3.2 (Biblioteca + Wishlist + Ranking)</span>
             <span class="badge status-Jogando">● Banco Online</span>
           </div>
         </section>
@@ -267,6 +359,7 @@
 
   <div id="toast" class="toast hidden"></div>
 
+  <script src="wishlist.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

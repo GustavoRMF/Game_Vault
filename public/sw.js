@@ -1,8 +1,9 @@
-const CACHE = 'gamevault-v8';
+const CACHE = 'gamevault-v10';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
+  './wishlist.js',
   './app.js',
   './manifest.json',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
@@ -32,7 +33,6 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Network-First: sempre busca a versão mais nova no Render e atualiza o cache
   e.respondWith(
     fetch(e.request)
       .then(res => {

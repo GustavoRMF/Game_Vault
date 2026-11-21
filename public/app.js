@@ -1,5 +1,5 @@
 // ========================================
-// GameVault - Gerenciador de Biblioteca & Ranking (Multi-User + 3D Gamer)
+// GameVault - Biblioteca, Ranking & Core (Multi-User + 3D Gamer)
 // ========================================
 
 let games = [];
@@ -33,6 +33,7 @@ function clearSession() {
   authToken = null;
   currentUser = null;
   games = [];
+  if (typeof wishlist !== 'undefined') wishlist = [];
   localStorage.removeItem('gv_token');
   localStorage.removeItem('gv_user');
 }
@@ -152,8 +153,9 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     saveSession(data.token, data.user);
     document.getElementById('auth-form').reset();
     updateAuthUI();
-    await loadGames();
+    await Promise.all([loadGames(), loadWishlist()]);
     render();
+    renderWishlist();
     showToast(authMode === 'login' ? `Bem-vindo de volta, ${data.user.username}!` : `Conta criada! Bem-vindo, ${data.user.username}!`);
   } catch (err) {
     showToast(err.message);
@@ -192,8 +194,9 @@ document.getElementById('forgot-form').addEventListener('submit', async (e) => {
     document.getElementById('forgot-form').reset();
     switchAuthMode('login');
     updateAuthUI();
-    await loadGames();
+    await Promise.all([loadGames(), loadWishlist()]);
     render();
+    renderWishlist();
     showToast(`Senha redefinida com sucesso! Bem-vindo, ${data.user.username}!`);
   } catch (err) {
     showToast(err.message);
@@ -205,6 +208,7 @@ document.getElementById('forgot-form').addEventListener('submit', async (e) => {
 document.getElementById('logout-btn').addEventListener('click', () => {
   clearSession();
   resetForm();
+  if (typeof resetWishForm === 'function') resetWishForm();
   switchAuthMode('login');
   updateAuthUI();
   showToast('Você saiu da conta.');
@@ -233,7 +237,7 @@ if (authStage && authPanel) {
   });
 }
 
-// ===== Persistência (API + PostgreSQL Neon) =====
+// ===== Persistência Biblioteca (API + PostgreSQL Neon) =====
 async function loadGames() {
   if (!authToken) return;
   try {
@@ -242,9 +246,7 @@ async function loadGames() {
     games = await res.json();
   } catch (e) {
     console.error(e);
-    if (e.message !== 'Sessão expirada') {
-      showToast('Erro ao conectar com o servidor.');
-    }
+    if (e.message !== 'Sessão expirada') showToast('Erro ao conectar com o servidor.');
     games = [];
   }
 }
@@ -314,7 +316,7 @@ document.getElementById('refresh-ranking-btn').addEventListener('click', () => {
   showToast('Ranking atualizado!');
 });
 
-// ===== Helpers =====
+// ===== Helpers Globais =====
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -350,7 +352,7 @@ function showToast(msg) {
   t._timer = setTimeout(() => t.classList.add('hidden'), 3200);
 }
 
-// ===== CRUD =====
+// ===== CRUD Biblioteca =====
 async function addGame(data) {
   const game = { id: generateId(), ...data, addedAt: Date.now() };
   const res = await apiFetch('/api/games', {
@@ -445,14 +447,14 @@ function importBackup(file) {
   reader.readAsText(file);
 }
 
-// ===== IGDB API (via backend) =====
-async function fetchCover(title) {
+// ===== IGDB API (Capa & Autocomplete reutilizável) =====
+async function fetchCoverToFields(title, btnId, coverInputId) {
   if (!title.trim()) {
     showToast('Digite um título primeiro.');
     return;
   }
 
-  const btn = document.getElementById('fetch-cover-btn');
+  const btn = document.getElementById(btnId);
   btn.disabled = true;
   btn.textContent = '⏳';
 
@@ -462,7 +464,7 @@ async function fetchCover(title) {
     if (!res.ok) throw new Error(data.error || 'Erro na API');
 
     if (data.cover) {
-      document.getElementById('cover').value = data.cover;
+      document.getElementById(coverInputId).value = data.cover;
       showToast('Capa encontrada!');
     } else {
       showToast('Jogo não encontrado ou sem capa.');
@@ -475,77 +477,95 @@ async function fetchCover(title) {
   }
 }
 
-// ===== Autocomplete ao digitar o Título =====
-const titleInput = document.getElementById('title');
-const suggestionsBox = document.getElementById('title-suggestions');
-let searchDebounceTimer = null;
-let currentSuggestions = [];
+function setupGameAutocomplete({ inputId, dropdownId, coverId, genreId }) {
+  const inputEl = document.getElementById(inputId);
+  const boxEl = document.getElementById(dropdownId);
+  if (!inputEl || !boxEl) return;
 
-titleInput.addEventListener('input', () => {
-  const query = titleInput.value.trim();
-  clearTimeout(searchDebounceTimer);
+  let debounceTimer = null;
+  let suggestions = [];
 
-  if (query.length < 2) {
-    suggestionsBox.classList.add('hidden');
-    suggestionsBox.innerHTML = '';
-    return;
-  }
+  inputEl.addEventListener('input', () => {
+    const query = inputEl.value.trim();
+    clearTimeout(debounceTimer);
 
-  suggestionsBox.classList.remove('hidden');
-  suggestionsBox.innerHTML = '<div class="suggestion-status">🔍 Buscando jogos na IGDB...</div>';
-
-  searchDebounceTimer = setTimeout(async () => {
-    try {
-      const res = await apiFetch(`/api/games/search?q=${encodeURIComponent(query)}`);
-      if (!res.ok) throw new Error('Erro na busca');
-      currentSuggestions = await res.json();
-
-      if (!currentSuggestions.length) {
-        suggestionsBox.innerHTML = '<div class="suggestion-status">Nenhum jogo encontrado com esse nome.</div>';
-        return;
-      }
-
-      suggestionsBox.innerHTML = currentSuggestions.map((item, idx) => `
-        <div class="suggestion-item" data-index="${idx}">
-          ${item.thumb
-            ? `<img class="suggestion-thumb" src="${escapeHtml(item.thumb)}" alt="">`
-            : `<div class="suggestion-thumb"></div>`}
-          <div class="suggestion-info">
-            <span class="suggestion-name">${escapeHtml(item.name)}</span>
-            <span class="suggestion-meta">
-              ${item.year ? `📅 ${item.year}` : ''} ${item.genre ? `• 🎮 ${escapeHtml(item.genre)}` : ''}
-            </span>
-          </div>
-        </div>
-      `).join('');
-    } catch (err) {
-      if (err.message !== 'Sessão expirada') {
-        suggestionsBox.innerHTML = '<div class="suggestion-status">Erro ao buscar sugestões.</div>';
-      }
+    if (query.length < 2) {
+      boxEl.classList.add('hidden');
+      boxEl.innerHTML = '';
+      return;
     }
-  }, 400);
+
+    boxEl.classList.remove('hidden');
+    boxEl.innerHTML = '<div class="suggestion-status">🔍 Buscando jogos na IGDB...</div>';
+
+    debounceTimer = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/games/search?q=${encodeURIComponent(query)}`);
+        if (!res.ok) throw new Error('Erro na busca');
+        suggestions = await res.json();
+
+        if (!suggestions.length) {
+          boxEl.innerHTML = '<div class="suggestion-status">Nenhum jogo encontrado com esse nome.</div>';
+          return;
+        }
+
+        boxEl.innerHTML = suggestions.map((item, idx) => `
+          <div class="suggestion-item" data-index="${idx}">
+            ${item.thumb
+              ? `<img class="suggestion-thumb" src="${escapeHtml(item.thumb)}" alt="">`
+              : `<div class="suggestion-thumb"></div>`}
+            <div class="suggestion-info">
+              <span class="suggestion-name">${escapeHtml(item.name)}</span>
+              <span class="suggestion-meta">
+                ${item.year ? `📅 ${item.year}` : ''} ${item.genre ? `• 🎮 ${escapeHtml(item.genre)}` : ''}
+              </span>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        if (err.message !== 'Sessão expirada') {
+          boxEl.innerHTML = '<div class="suggestion-status">Erro ao buscar sugestões.</div>';
+        }
+      }
+    }, 400);
+  });
+
+  boxEl.addEventListener('click', (e) => {
+    const itemEl = e.target.closest('.suggestion-item');
+    if (!itemEl) return;
+
+    const selected = suggestions[Number(itemEl.dataset.index)];
+    if (!selected) return;
+
+    inputEl.value = selected.name;
+    if (selected.cover) document.getElementById(coverId).value = selected.cover;
+    const genreInput = document.getElementById(genreId);
+    if (selected.genre && genreInput && !genreInput.value.trim()) {
+      genreInput.value = selected.genre;
+    }
+
+    boxEl.classList.add('hidden');
+    showToast(`Selecionado: ${selected.name}`);
+  });
+}
+
+setupGameAutocomplete({
+  inputId: 'title',
+  dropdownId: 'title-suggestions',
+  coverId: 'cover',
+  genreId: 'genre'
 });
 
-suggestionsBox.addEventListener('click', (e) => {
-  const itemEl = e.target.closest('.suggestion-item');
-  if (!itemEl) return;
-
-  const selected = currentSuggestions[Number(itemEl.dataset.index)];
-  if (!selected) return;
-
-  titleInput.value = selected.name;
-  if (selected.cover) document.getElementById('cover').value = selected.cover;
-  if (selected.genre && !document.getElementById('genre').value.trim()) {
-    document.getElementById('genre').value = selected.genre;
-  }
-
-  suggestionsBox.classList.add('hidden');
-  showToast(`Selecionado: ${selected.name}`);
+setupGameAutocomplete({
+  inputId: 'wish-title',
+  dropdownId: 'wish-suggestions',
+  coverId: 'wish-cover',
+  genreId: 'wish-genre'
 });
 
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.autocomplete-wrapper')) {
-    suggestionsBox.classList.add('hidden');
+    document.querySelectorAll('.suggestions-dropdown').forEach(el => el.classList.add('hidden'));
   }
 });
 
@@ -593,7 +613,7 @@ function renderCharts() {
   });
 }
 
-// ===== Renderização =====
+// ===== Renderização Biblioteca =====
 function getFilteredGames() {
   const search = document.getElementById('search').value.toLowerCase().trim();
   const platform = document.getElementById('filter-platform').value;
@@ -691,7 +711,7 @@ function render() {
   renderGames();
 }
 
-// ===== Formulário =====
+// ===== Formulário Biblioteca =====
 function getFormData() {
   return {
     title: document.getElementById('title').value.trim(),
@@ -745,10 +765,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById(`tab-${target}`).classList.remove('hidden');
 
     if (target === 'library') renderCharts();
+    if (target === 'wishlist' && typeof renderWishlist === 'function') renderWishlist();
     if (target === 'ranking') loadRanking();
   });
 });
 
+// Eventos Biblioteca
 document.getElementById('game-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = getFormData();
@@ -783,13 +805,15 @@ document.getElementById('games-list').addEventListener('click', (e) => {
 });
 
 document.getElementById('cancel-edit').addEventListener('click', resetForm);
+document.getElementById('fetch-cover-btn').addEventListener('click', () => {
+  fetchCoverToFields(document.getElementById('title').value, 'fetch-cover-btn', 'cover');
+});
+
+// Eventos Backup & Filtros Biblioteca
 document.getElementById('export-btn').addEventListener('click', exportBackup);
 document.getElementById('import-input').addEventListener('change', (e) => {
   if (e.target.files[0]) importBackup(e.target.files[0]);
   e.target.value = '';
-});
-document.getElementById('fetch-cover-btn').addEventListener('click', () => {
-  fetchCover(document.getElementById('title').value);
 });
 
 document.getElementById('search').addEventListener('input', renderGames);
@@ -797,33 +821,39 @@ document.getElementById('search').addEventListener('input', renderGames);
   document.getElementById(id).addEventListener('change', renderGames);
 });
 
-// ===== Efeito 3D Tilt nos Cards =====
-const gamesListEl = document.getElementById('games-list');
+// ===== Efeito 3D Tilt nos Cards (Biblioteca + Lista de Desejos) =====
+function bind3DTilt(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
 
-gamesListEl.addEventListener('mousemove', (e) => {
-  const card = e.target.closest('.game-card');
-  if (!card) return;
+  container.addEventListener('mousemove', (e) => {
+    const card = e.target.closest('.game-card');
+    if (!card) return;
 
-  const rect = card.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-  card.style.setProperty('--mouse-x', `${x}px`);
-  card.style.setProperty('--mouse-y', `${y}px`);
+    card.style.setProperty('--mouse-x', `${x}px`);
+    card.style.setProperty('--mouse-y', `${y}px`);
 
-  const rotateY = ((x / rect.width) - 0.5) * 14;
-  const rotateX = ((y / rect.height) - 0.5) * -14;
+    const rotateY = ((x / rect.width) - 0.5) * 14;
+    const rotateX = ((y / rect.height) - 0.5) * -14;
 
-  card.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-4px)`;
-});
+    card.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-4px)`;
+  });
 
-gamesListEl.addEventListener('mouseout', (e) => {
-  const card = e.target.closest('.game-card');
-  if (!card) return;
-  if (!card.contains(e.relatedTarget)) {
-    card.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0)';
-  }
-});
+  container.addEventListener('mouseout', (e) => {
+    const card = e.target.closest('.game-card');
+    if (!card) return;
+    if (!card.contains(e.relatedTarget)) {
+      card.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0)';
+    }
+  });
+}
+
+bind3DTilt('games-list');
+bind3DTilt('wish-list');
 
 // ===== PWA / Service Worker =====
 if ('serviceWorker' in navigator) {
@@ -859,7 +889,8 @@ window.addEventListener('appinstalled', () => {
   loadSession();
   updateAuthUI();
   if (authToken && currentUser) {
-    await loadGames();
+    await Promise.all([loadGames(), loadWishlist()]);
     render();
+    renderWishlist();
   }
 })();
