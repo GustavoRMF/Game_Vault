@@ -180,3 +180,13 @@ app.get('/api/cover', async (req, res) => {
     res.status(500).json({ error: err.message || 'Erro ao consultar IGDB' });
   }
 });
+
+// Inicializa o banco de dados e sobe o servidor
+initDB()
+  .then(() => {
+    app.listen(PORT, () => console.log(`GameVault rodando na porta ${PORT}`));
+  })
+  .catch((err) => {
+    console.error('Falha ao iniciar banco de dados:', err);
+    process.exit(1);
+  });
