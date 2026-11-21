@@ -362,6 +362,24 @@ function startEdit(id) {
 }
 
 // ===== Eventos =====
+// ===== Troca de Abas =====
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.tab;
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    document.querySelectorAll('.tab-content').forEach(content => {
+      content.classList.add('hidden');
+    });
+    document.getElementById(`tab-${target}`).classList.remove('hidden');
+
+    // Re-renderiza gráficos se voltar para a biblioteca para garantir alinhamento
+    if (target === 'library') renderCharts();
+  });
+});
+
 document.getElementById('game-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = getFormData();
