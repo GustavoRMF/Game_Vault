@@ -48,11 +48,40 @@ header p {
   font-size: 1rem;
 }
 
-/* ===== Navegação por Abas 3D ===== */
+/* ===== Barra de Usuário & Abas 3D ===== */
+.user-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  font-size: 0.9rem;
+}
+
+.btn-logout {
+  background: rgba(248, 113, 113, 0.2);
+  color: #fca5a5;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+.btn-logout:hover { background: rgba(248, 113, 113, 0.35); }
+
 .tabs-nav {
   display: inline-flex;
-  gap: 10px;
-  margin-top: 22px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
   padding: 6px;
   background: rgba(8, 12, 24, 0.75);
   border-radius: 14px;
@@ -61,18 +90,16 @@ header p {
 }
 
 .tab-btn {
-  padding: 10px 22px;
+  padding: 10px 20px;
   border-radius: 10px;
   background: transparent;
   color: #94a3b8;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 700;
   transition: all 0.15s ease;
 }
 
-.tab-btn:hover {
-  color: #fff;
-}
+.tab-btn:hover { color: #fff; }
 
 .tab-btn.active {
   background: linear-gradient(180deg, #00d4ff 0%, #0088cc 100%);
@@ -102,7 +129,7 @@ main {
   padding: 28px 16px;
 }
 
-/* ===== Seções com Camadas 3D (Glass + Luz Superior) ===== */
+/* ===== Seções com Camadas 3D ===== */
 section {
   background: linear-gradient(145deg, rgba(26, 36, 64, 0.75), rgba(15, 23, 42, 0.85));
   backdrop-filter: blur(14px);
@@ -136,6 +163,48 @@ section h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+/* ===== Tela de Login / Cadastro ===== */
+.auth-card {
+  max-width: 440px;
+  margin: 20px auto;
+  padding: 28px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: rgba(8, 12, 24, 0.75);
+  padding: 6px;
+  border-radius: 12px;
+  margin-bottom: 22px;
+}
+
+.auth-tab-btn {
+  padding: 10px;
+  background: transparent;
+  color: #94a3b8;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.auth-tab-btn.active {
+  background: linear-gradient(180deg, #00d4ff 0%, #0088cc 100%);
+  color: #051324;
+  box-shadow: 0 3px 0 #005580;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.full-btn {
+  width: 100%;
+  margin-top: 6px;
 }
 
 /* ===== Botões Táteis 3D ===== */
@@ -234,7 +303,6 @@ button:disabled {
   gap: 14px;
 }
 .backup-status {
-  margin-top: 14px;
   font-size: 0.9rem;
   color: #4ade80;
   font-weight: 600;
@@ -258,7 +326,7 @@ button:disabled {
   box-shadow: inset 0 4px 14px rgba(0, 0, 0, 0.6);
 }
 
-/* ===== Formulário com Inputs Profundos ===== */
+/* ===== Formulário ===== */
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -420,9 +488,7 @@ input:focus, select:focus, textarea:focus {
   z-index: 2;
 }
 
-.game-card:hover::before {
-  opacity: 1;
-}
+.game-card:hover::before { opacity: 1; }
 
 .game-card:hover {
   box-shadow: 
@@ -441,9 +507,7 @@ input:focus, select:focus, textarea:focus {
   transition: transform 0.3s ease;
 }
 
-.game-card:hover .game-cover {
-  transform: translateZ(26px) scale(1.02);
-}
+.game-card:hover .game-cover { transform: translateZ(26px) scale(1.02); }
 
 .game-header {
   display: flex;
@@ -534,6 +598,100 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 3px 0 rgba(127, 29, 29, 0.6);
 }
 .btn-delete:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(127, 29, 29, 0.6); }
+
+/* ===== Ranking & Pódio 3D ===== */
+.ranking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.ranking-header h2 { margin-bottom: 0; }
+
+.podium-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.podium-card {
+  background: linear-gradient(160deg, #1e293b 0%, #0b1120 100%);
+  border-radius: 16px;
+  padding: 20px 16px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.2s ease;
+}
+.podium-card:hover { transform: translateY(-5px); }
+
+.podium-1 {
+  border-top: 2px solid #facc15;
+  box-shadow: 0 14px 30px rgba(250, 204, 21, 0.2), 0 5px 0 #713f12;
+}
+.podium-2 {
+  border-top: 2px solid #cbd5e1;
+  box-shadow: 0 12px 24px rgba(203, 213, 225, 0.14), 0 5px 0 #334155;
+}
+.podium-3 {
+  border-top: 2px solid #d97706;
+  box-shadow: 0 12px 24px rgba(217, 119, 6, 0.14), 0 5px 0 #451a03;
+}
+
+.podium-medal { font-size: 2.2rem; margin-bottom: 6px; }
+.podium-name { font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 6px; }
+.podium-hours { font-size: 1.5rem; font-weight: 800; color: #00d4ff; }
+.podium-sub { font-size: 0.82rem; color: #94a3b8; margin-top: 6px; }
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rank-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: rgba(8, 12, 24, 0.65);
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rank-row.is-me {
+  border-color: #00d4ff;
+  background: rgba(0, 212, 255, 0.08);
+}
+
+.rank-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rank-pos {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: #00d4ff;
+  min-width: 34px;
+}
+
+.rank-user {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.rank-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 
 .empty-msg {
   text-align: center;

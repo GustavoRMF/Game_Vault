@@ -1,24 +1,216 @@
 // ========================================
-// GameVault - Gerenciador de Biblioteca (Cloud + 3D)
+// GameVault - Gerenciador de Biblioteca & Ranking (Multi-User + 3D)
 // ========================================
 
 let games = [];
 let editingId = null;
 let deferredPrompt = null;
 let charts = { platforms: null, status: null };
+let authMode = 'login'; // 'login' | 'register'
+let currentUser = null;
+let authToken = null;
+
+// ===== Autenticação & Sessão =====
+function loadSession() {
+  try {
+    authToken = localStorage.getItem('gv_token');
+    const savedUser = localStorage.getItem('gv_user');
+    currentUser = savedUser ? JSON.parse(savedUser) : null;
+  } catch {
+    authToken = null;
+    currentUser = null;
+  }
+}
+
+function saveSession(token, user) {
+  authToken = token;
+  currentUser = user;
+  localStorage.setItem('gv_token', token);
+  localStorage.setItem('gv_user', JSON.stringify(user));
+}
+
+function clearSession() {
+  authToken = null;
+  currentUser = null;
+  games = [];
+  localStorage.removeItem('gv_token');
+  localStorage.removeItem('gv_user');
+}
+
+async function apiFetch(url, options = {}) {
+  const headers = {
+    ...(options.headers || {}),
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+  };
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    clearSession();
+    updateAuthUI();
+    showToast('Sessão expirada. Faça login novamente.');
+    throw new Error('Sessão expirada');
+  }
+  return res;
+}
+
+function updateAuthUI() {
+  const authSection = document.getElementById('auth-section');
+  const appContent = document.getElementById('app-content');
+  const userBar = document.getElementById('user-bar');
+
+  if (authToken && currentUser) {
+    authSection.classList.add('hidden');
+    appContent.classList.remove('hidden');
+    userBar.classList.remove('hidden');
+    document.getElementById('current-username').textContent = currentUser.username;
+  } else {
+    authSection.classList.remove('hidden');
+    appContent.classList.add('hidden');
+    userBar.classList.add('hidden');
+  }
+}
+
+function switchAuthMode(mode) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.auth === mode);
+  });
+
+  const titleEl = document.getElementById('auth-title');
+  const subEl = document.getElementById('auth-subtitle');
+  const submitBtn = document.getElementById('auth-submit-btn');
+
+  if (mode === 'login') {
+    titleEl.textContent = 'Entrar no GameVault';
+    subEl.textContent = 'Acesse sua biblioteca e dispute o topo do ranking de horas jogadas.';
+    submitBtn.textContent = 'Entrar na Conta';
+  } else {
+    titleEl.textContent = 'Criar Nova Conta';
+    subEl.textContent = 'Cadastre sua Gamertag para salvar seus jogos e competir no ranking.';
+    submitBtn.textContent = 'Cadastrar e Entrar';
+  }
+}
+
+document.querySelectorAll('.auth-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchAuthMode(btn.dataset.auth));
+});
+
+document.getElementById('auth-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('auth-username').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const submitBtn = document.getElementById('auth-submit-btn');
+
+  submitBtn.disabled = true;
+  try {
+    const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro de autenticação');
+
+    saveSession(data.token, data.user);
+    document.getElementById('auth-form').reset();
+    updateAuthUI();
+    await loadGames();
+    render();
+    showToast(authMode === 'login' ? `Bem-vindo de volta, ${data.user.username}!` : `Conta criada! Bem-vindo, ${data.user.username}!`);
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  clearSession();
+  resetForm();
+  updateAuthUI();
+  showToast('Você saiu da conta.');
+});
 
 // ===== Persistência (API + PostgreSQL Neon) =====
 async function loadGames() {
+  if (!authToken) return;
   try {
-    const res = await fetch('/api/games');
+    const res = await apiFetch('/api/games');
     if (!res.ok) throw new Error('Falha ao carregar biblioteca');
     games = await res.json();
   } catch (e) {
     console.error(e);
-    showToast('Erro ao conectar com o servidor.');
+    if (e.message !== 'Sessão expirada') {
+      showToast('Erro ao conectar com o servidor.');
+    }
     games = [];
   }
 }
+
+// ===== Ranking & Competição =====
+async function loadRanking() {
+  const podiumEl = document.getElementById('ranking-podium');
+  const listEl = document.getElementById('ranking-list');
+  podiumEl.innerHTML = '<p class="empty-msg">Carregando ranking...</p>';
+  listEl.innerHTML = '';
+
+  try {
+    const res = await apiFetch('/api/ranking');
+    if (!res.ok) throw new Error('Erro ao carregar ranking');
+    const ranking = await res.json();
+
+    if (!ranking.length) {
+      podiumEl.innerHTML = '<p class="empty-msg">Nenhum jogador registrado ainda.</p>';
+      return;
+    }
+
+    const medals = ['🥇', '🥈', '🥉'];
+    const top3 = ranking.slice(0, 3);
+
+    podiumEl.innerHTML = top3.map((player, idx) => {
+      const isMe = currentUser && player.id === currentUser.id;
+      return `
+        <div class="podium-card podium-${idx + 1}">
+          <div class="podium-medal">${medals[idx]}</div>
+          <div class="podium-name">${escapeHtml(player.username)} ${isMe ? '(Você)' : ''}</div>
+          <div class="podium-hours">${Number(player.total_hours).toFixed(1)}h</div>
+          <div class="podium-sub">
+            🎮 ${player.total_games} jogos • 🏆 ${player.platinums} platinas • ✅ ${player.completed} zerados
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    listEl.innerHTML = ranking.map((player, idx) => {
+      const isMe = currentUser && player.id === currentUser.id;
+      const posLabel = idx < 3 ? medals[idx] : `#${idx + 1}`;
+      return `
+        <div class="rank-row ${isMe ? 'is-me' : ''}">
+          <div class="rank-left">
+            <span class="rank-pos">${posLabel}</span>
+            <span class="rank-user">${escapeHtml(player.username)} ${isMe ? '<span class="badge status-Jogando">Você</span>' : ''}</span>
+          </div>
+          <div class="rank-stats">
+            <span class="badge">⏱ ${Number(player.total_hours).toFixed(1)}h</span>
+            <span class="badge rating">🏆 ${player.platinums} 100%</span>
+            <span class="badge status-Zerado">✅ ${player.completed} zerados</span>
+            <span class="badge">📚 ${player.total_games} jogos</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    if (err.message !== 'Sessão expirada') {
+      podiumEl.innerHTML = '<p class="empty-msg">Não foi possível carregar o ranking agora.</p>';
+      showToast(err.message);
+    }
+  }
+}
+
+document.getElementById('refresh-ranking-btn').addEventListener('click', () => {
+  loadRanking();
+  showToast('Ranking atualizado!');
+});
 
 // ===== Helpers =====
 function generateId() {
@@ -59,12 +251,14 @@ function showToast(msg) {
 // ===== CRUD =====
 async function addGame(data) {
   const game = { id: generateId(), ...data, addedAt: Date.now() };
-  const res = await fetch('/api/games', {
+  const res = await apiFetch('/api/games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(game)
   });
   if (!res.ok) throw new Error('Erro ao salvar');
+  const saved = await res.json();
+  if (saved.id) game.id = saved.id;
   games.unshift(game);
   return game;
 }
@@ -72,7 +266,7 @@ async function addGame(data) {
 async function updateGame(id, data) {
   const idx = games.findIndex(g => g.id === id);
   if (idx === -1) return false;
-  const res = await fetch(`/api/games/${encodeURIComponent(id)}`, {
+  const res = await apiFetch(`/api/games/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -85,14 +279,14 @@ async function updateGame(id, data) {
 async function deleteGame(id) {
   if (!confirm('Excluir este jogo?')) return;
   try {
-    const res = await fetch(`/api/games/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/games/${encodeURIComponent(id)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Erro ao excluir');
     games = games.filter(g => g.id !== id);
     if (editingId === id) resetForm();
     render();
     showToast('Jogo excluído.');
   } catch (err) {
-    showToast(err.message);
+    if (err.message !== 'Sessão expirada') showToast(err.message);
   }
 }
 
@@ -110,7 +304,7 @@ function exportBackup() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `gamevault-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `gamevault-${currentUser?.username || 'backup'}-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('Backup exportado!');
@@ -122,10 +316,10 @@ function importBackup(file) {
     try {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('Formato inválido');
-      const valid = imported.filter(g => g && typeof g.id === 'string' && g.title && g.platform);
+      const valid = imported.filter(g => g && g.title && g.platform);
       if (valid.length === 0) throw new Error('Nenhum jogo válido');
 
-      const res = await fetch('/api/games/bulk', {
+      const res = await apiFetch('/api/games/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(valid)
@@ -143,13 +337,13 @@ function importBackup(file) {
       document.getElementById('backup-status').textContent = `✅ ${count} jogo(s) importado(s)`;
       showToast(`${count} jogo(s) importado(s)!`);
     } catch (err) {
-      showToast('Erro ao importar: ' + err.message);
+      if (err.message !== 'Sessão expirada') showToast('Erro ao importar: ' + err.message);
     }
   };
   reader.readAsText(file);
 }
 
-// ===== RAWG API (via backend) =====
+// ===== IGDB API (via backend) =====
 async function fetchCover(title) {
   if (!title.trim()) {
     showToast('Digite um título primeiro.');
@@ -161,7 +355,7 @@ async function fetchCover(title) {
   btn.textContent = '⏳';
 
   try {
-    const res = await fetch(`/api/cover?title=${encodeURIComponent(title)}`);
+    const res = await apiFetch(`/api/cover?title=${encodeURIComponent(title)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Erro na API');
 
@@ -172,7 +366,7 @@ async function fetchCover(title) {
       showToast('Jogo não encontrado ou sem capa.');
     }
   } catch (e) {
-    showToast('Erro ao buscar capa: ' + e.message);
+    if (e.message !== 'Sessão expirada') showToast('Erro ao buscar capa: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = '🔍';
@@ -361,7 +555,6 @@ function startEdit(id) {
   document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
 }
 
-// ===== Eventos =====
 // ===== Troca de Abas =====
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -375,8 +568,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
     document.getElementById(`tab-${target}`).classList.remove('hidden');
 
-    // Re-renderiza gráficos se voltar para a biblioteca para garantir alinhamento
     if (target === 'library') renderCharts();
+    if (target === 'ranking') loadRanking();
   });
 });
 
@@ -399,7 +592,7 @@ document.getElementById('game-form').addEventListener('submit', async (e) => {
     resetForm();
     render();
   } catch (err) {
-    showToast(err.message);
+    if (err.message !== 'Sessão expirada') showToast(err.message);
   } finally {
     submitBtn.disabled = false;
   }
@@ -487,6 +680,10 @@ window.addEventListener('appinstalled', () => {
 
 // ===== Init =====
 (async () => {
-  await loadGames();
-  render();
+  loadSession();
+  updateAuthUI();
+  if (authToken && currentUser) {
+    await loadGames();
+    render();
+  }
 })();

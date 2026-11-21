@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GameVault - Biblioteca de Jogos</title>
+  <title>GameVault - Biblioteca & Ranking</title>
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0b0f19">
@@ -13,164 +13,216 @@
 <body>
   <header>
     <h1>🎮 GameVault</h1>
-    <p>Sua biblioteca e histórico de jogos</p>
+    <p>Sua biblioteca, conquistas e ranking de jogadores</p>
     <button id="install-btn" class="btn-install hidden">📲 Instalar App</button>
 
-    <!-- Navegação por Abas -->
-    <nav class="tabs-nav">
-      <button type="button" class="tab-btn active" data-tab="library">🎮 Biblioteca</button>
-      <button type="button" class="tab-btn" data-tab="settings">⚙️ Configurações</button>
-    </nav>
+    <!-- Barra do Usuário Logado + Navegação por Abas -->
+    <div id="user-bar" class="user-bar hidden">
+      <div class="user-badge">
+        <span>👤 <strong id="current-username">Jogador</strong></span>
+        <button type="button" id="logout-btn" class="btn-logout">Sair</button>
+      </div>
+
+      <nav class="tabs-nav">
+        <button type="button" class="tab-btn active" data-tab="library">🎮 Biblioteca</button>
+        <button type="button" class="tab-btn" data-tab="ranking">🏆 Ranking</button>
+        <button type="button" class="tab-btn" data-tab="settings">⚙️ Configurações</button>
+      </nav>
+    </div>
   </header>
 
   <main>
-    <!-- ==================== ABA 1: BIBLIOTECA ==================== -->
-    <div id="tab-library" class="tab-content active">
-      <!-- Gráficos -->
-      <section class="charts-section">
-        <h2>📊 Estatísticas Visuais</h2>
-        <div class="charts-grid">
-          <div class="chart-box">
-            <canvas id="chart-platforms"></canvas>
-          </div>
-          <div class="chart-box">
-            <canvas id="chart-status"></canvas>
-          </div>
-        </div>
-      </section>
+    <!-- ==================== TELA DE LOGIN / CADASTRO ==================== -->
+    <section id="auth-section" class="auth-card">
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab-btn active" data-auth="login">🔑 Entrar</button>
+        <button type="button" class="auth-tab-btn" data-auth="register">✨ Criar Conta</button>
+      </div>
 
-      <!-- Formulário -->
-      <section class="form-section">
-        <h2 id="form-title">➕ Adicionar Jogo</h2>
-        <form id="game-form">
-          <input type="hidden" id="game-id">
-          
-          <div class="form-grid">
-            <div class="field">
-              <label for="title">Título *</label>
-              <div class="input-with-btn">
-                <input type="text" id="title" required placeholder="Ex: God of War">
-                <button type="button" id="fetch-cover-btn" title="Buscar capa automaticamente">🔍</button>
+      <h2 id="auth-title">Entrar no GameVault</h2>
+      <p id="auth-subtitle" class="settings-desc">Acesse sua biblioteca e dispute o topo do ranking de horas jogadas.</p>
+
+      <form id="auth-form" class="auth-form">
+        <div class="field">
+          <label for="auth-username">Nome de Usuário (Gamertag)</label>
+          <input type="text" id="auth-username" required minlength="3" maxlength="30" placeholder="Ex: GustavoGamer">
+        </div>
+
+        <div class="field">
+          <label for="auth-password">Senha</label>
+          <input type="password" id="auth-password" required minlength="4" placeholder="••••••••">
+        </div>
+
+        <button type="submit" id="auth-submit-btn" class="btn-primary full-btn">Entrar na Conta</button>
+      </form>
+    </section>
+
+    <!-- ==================== CONTEÚDO LOGADO ==================== -->
+    <div id="app-content" class="hidden">
+
+      <!-- ABA 1: BIBLIOTECA -->
+      <div id="tab-library" class="tab-content active">
+        <section class="charts-section">
+          <h2>📊 Estatísticas Visuais</h2>
+          <div class="charts-grid">
+            <div class="chart-box"><canvas id="chart-platforms"></canvas></div>
+            <div class="chart-box"><canvas id="chart-status"></canvas></div>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <h2 id="form-title">➕ Adicionar Jogo</h2>
+          <form id="game-form">
+            <input type="hidden" id="game-id">
+            
+            <div class="form-grid">
+              <div class="field">
+                <label for="title">Título *</label>
+                <div class="input-with-btn">
+                  <input type="text" id="title" required placeholder="Ex: God of War">
+                  <button type="button" id="fetch-cover-btn" title="Buscar capa automaticamente">🔍</button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="platform">Plataforma *</label>
+                <select id="platform" required>
+                  <option value="">Selecione...</option>
+                  <option value="PS3">PS3</option>
+                  <option value="PS4">PS4</option>
+                  <option value="PS5">PS5</option>
+                  <option value="PC">PC</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="genre">Gênero</label>
+                <input type="text" id="genre" placeholder="Ex: Ação, RPG...">
+              </div>
+
+              <div class="field">
+                <label for="status">Status *</label>
+                <select id="status" required>
+                  <option value="Não iniciado">Não iniciado</option>
+                  <option value="Jogando">Jogando</option>
+                  <option value="Zerado">Zerado</option>
+                  <option value="100%">100% / Platinado</option>
+                  <option value="Abandonado">Abandonado</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="rating">Nota (0-10)</label>
+                <input type="number" id="rating" min="0" max="10" step="0.5" placeholder="8.5">
+              </div>
+
+              <div class="field">
+                <label for="hours">Horas jogadas</label>
+                <input type="number" id="hours" min="0" step="0.5" placeholder="0">
+              </div>
+
+              <div class="field full">
+                <label for="cover">URL da Capa</label>
+                <input type="url" id="cover" placeholder="https://... (ou use o botão 🔍)">
+              </div>
+
+              <div class="field full">
+                <label for="notes">Observações</label>
+                <textarea id="notes" rows="2" placeholder="Comentários, dicas, troféus..."></textarea>
               </div>
             </div>
 
-            <div class="field">
-              <label for="platform">Plataforma *</label>
-              <select id="platform" required>
-                <option value="">Selecione...</option>
-                <option value="PS3">PS3</option>
-                <option value="PS4">PS4</option>
-                <option value="PS5">PS5</option>
-                <option value="PC">PC</option>
-              </select>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Salvar Jogo</button>
+              <button type="button" id="cancel-edit" class="btn-secondary hidden">Cancelar</button>
             </div>
+          </form>
+        </section>
 
-            <div class="field">
-              <label for="genre">Gênero</label>
-              <input type="text" id="genre" placeholder="Ex: Ação, RPG...">
-            </div>
+        <section class="filters">
+          <input type="search" id="search" placeholder="🔍 Buscar por título...">
+          <select id="filter-platform">
+            <option value="">Todas plataformas</option>
+            <option value="PS3">PS3</option>
+            <option value="PS4">PS4</option>
+            <option value="PS5">PS5</option>
+            <option value="PC">PC</option>
+          </select>
+          <select id="filter-status">
+            <option value="">Todos status</option>
+            <option value="Não iniciado">Não iniciado</option>
+            <option value="Jogando">Jogando</option>
+            <option value="Zerado">Zerado</option>
+            <option value="100%">100% / Platinado</option>
+            <option value="Abandonado">Abandonado</option>
+          </select>
+          <select id="sort-by">
+            <option value="added-desc">Mais recentes</option>
+            <option value="added-asc">Mais antigos</option>
+            <option value="title-asc">Título (A-Z)</option>
+            <option value="title-desc">Título (Z-A)</option>
+            <option value="rating-desc">Melhor nota</option>
+            <option value="hours-desc">Mais horas</option>
+          </select>
+        </section>
 
-            <div class="field">
-              <label for="status">Status *</label>
-              <select id="status" required>
-                <option value="Não iniciado">Não iniciado</option>
-                <option value="Jogando">Jogando</option>
-                <option value="Zerado">Zerado</option>
-                <option value="100%">100% / Platinado</option>
-                <option value="Abandonado">Abandonado</option>
-              </select>
-            </div>
+        <section class="stats" id="stats"></section>
 
-            <div class="field">
-              <label for="rating">Nota (0-10)</label>
-              <input type="number" id="rating" min="0" max="10" step="0.5" placeholder="8.5">
-            </div>
+        <section class="games-section">
+          <h2>📚 Biblioteca <span id="game-count"></span></h2>
+          <div id="games-list" class="games-grid"></div>
+          <p id="empty-msg" class="empty-msg">Nenhum jogo cadastrado ainda. Adicione seu primeiro jogo! 🎮</p>
+        </section>
+      </div>
 
-            <div class="field">
-              <label for="hours">Horas jogadas</label>
-              <input type="number" id="hours" min="0" step="0.5" placeholder="0">
-            </div>
-
-            <div class="field full">
-              <label for="cover">URL da Capa</label>
-              <input type="url" id="cover" placeholder="https://... (ou use o botão 🔍)">
-            </div>
-
-            <div class="field full">
-              <label for="notes">Observações</label>
-              <textarea id="notes" rows="2" placeholder="Comentários, dicas, troféus..."></textarea>
-            </div>
+      <!-- ABA 2: RANKING / COMPETIÇÃO -->
+      <div id="tab-ranking" class="tab-content hidden">
+        <section class="ranking-section">
+          <div class="ranking-header">
+            <h2>🏆 Ranking de Jogadores</h2>
+            <button type="button" id="refresh-ranking-btn" class="btn-secondary">🔄 Atualizar</button>
           </div>
+          <p class="settings-desc">
+            Classificação baseada no total de horas jogadas (desempate por platinas 100% e jogos zerados).
+          </p>
 
-          <div class="form-actions">
-            <button type="submit" class="btn-primary">Salvar Jogo</button>
-            <button type="button" id="cancel-edit" class="btn-secondary hidden">Cancelar</button>
+          <!-- Pódio Top 3 -->
+          <div id="ranking-podium" class="podium-grid"></div>
+
+          <!-- Lista Geral -->
+          <div id="ranking-list" class="ranking-list"></div>
+        </section>
+      </div>
+
+      <!-- ABA 3: CONFIGURAÇÕES -->
+      <div id="tab-settings" class="tab-content hidden">
+        <section class="backup-section">
+          <h2>💾 Backup e Restauração</h2>
+          <p class="settings-desc">
+            Exporte uma cópia de segurança dos seus jogos em formato JSON ou restaure jogos salvos na sua conta.
+          </p>
+          <div class="backup-actions">
+            <button id="export-btn" class="btn-primary">📤 Exportar Backup (JSON)</button>
+            <label class="btn-secondary file-label">
+              📥 Importar Backup (JSON)
+              <input type="file" id="import-input" accept=".json" hidden>
+            </label>
+            <span id="backup-status" class="backup-status"></span>
           </div>
-        </form>
-      </section>
+        </section>
 
-      <!-- Filtros -->
-      <section class="filters">
-        <input type="search" id="search" placeholder="🔍 Buscar por título...">
-        <select id="filter-platform">
-          <option value="">Todas plataformas</option>
-          <option value="PS3">PS3</option>
-          <option value="PS4">PS4</option>
-          <option value="PS5">PS5</option>
-          <option value="PC">PC</option>
-        </select>
-        <select id="filter-status">
-          <option value="">Todos status</option>
-          <option value="Não iniciado">Não iniciado</option>
-          <option value="Jogando">Jogando</option>
-          <option value="Zerado">Zerado</option>
-          <option value="100%">100% / Platinado</option>
-          <option value="Abandonado">Abandonado</option>
-        </select>
-        <select id="sort-by">
-          <option value="added-desc">Mais recentes</option>
-          <option value="added-asc">Mais antigos</option>
-          <option value="title-asc">Título (A-Z)</option>
-          <option value="title-desc">Título (Z-A)</option>
-          <option value="rating-desc">Melhor nota</option>
-          <option value="hours-desc">Mais horas</option>
-        </select>
-      </section>
+        <section class="info-section">
+          <h2>☁️ Sincronização e Sistema</h2>
+          <p class="settings-desc">
+            Seus dados estão vinculados à sua conta na nuvem com PostgreSQL (Neon) e capas integradas via IGDB.
+          </p>
+          <div class="settings-meta">
+            <span class="badge">Versão 3.0 (Multi-User + Ranking 3D)</span>
+            <span class="badge status-Jogando">● Banco Online</span>
+          </div>
+        </section>
+      </div>
 
-      <!-- Estatísticas -->
-      <section class="stats" id="stats"></section>
-
-      <!-- Lista de Jogos -->
-      <section class="games-section">
-        <h2>📚 Biblioteca <span id="game-count"></span></h2>
-        <div id="games-list" class="games-grid"></div>
-        <p id="empty-msg" class="empty-msg">Nenhum jogo cadastrado ainda. Adicione seu primeiro jogo! 🎮</p>
-      </section>
-    </div>
-
-    <!-- ==================== ABA 2: CONFIGURAÇÕES ==================== -->
-    <div id="tab-settings" class="tab-content hidden">
-      <section class="backup-section">
-        <h2>💾 Backup e Restauração</h2>
-        <p class="settings-desc">
-          Exporte uma cópia de segurança de toda a sua biblioteca em formato JSON ou importe jogos salvos anteriormente.
-        </p>
-        <div class="backup-actions">
-          <button type="button" id="export-btn" class="btn-primary">📤 Exportar Backup (JSON)</button>
-          <label class="btn-secondary file-label">
-            📥 Importar Backup (JSON)
-            <input type="file" id="import-input" accept=".json" hidden>
-          </label>
-        </div>
-        <p id="backup-status" class="backup-status"></p>
-      </section>
-
-      <section class="about-section">
-        <h2>ℹ️ Sobre o Sistema</h2>
-        <p class="settings-desc">
-          <strong>GameVault v2.0</strong> — Conectado na nuvem com PostgreSQL (Neon) e busca automática de capas via IGDB.
-        </p>
-      </section>
     </div>
   </main>
 
