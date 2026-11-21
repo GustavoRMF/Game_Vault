@@ -109,7 +109,7 @@ function switchAuthMode(mode) {
     submitBtn.textContent = 'Cadastrar e Entrar';
     ruleBadge.classList.remove('hidden');
     registerTip.classList.remove('hidden');
-    forgotLinkBox.add('hidden');
+    forgotLinkBox.classList.add('hidden');
   }
 }
 
@@ -474,6 +474,80 @@ async function fetchCover(title) {
     btn.textContent = '🔍';
   }
 }
+
+// ===== Autocomplete ao digitar o Título =====
+const titleInput = document.getElementById('title');
+const suggestionsBox = document.getElementById('title-suggestions');
+let searchDebounceTimer = null;
+let currentSuggestions = [];
+
+titleInput.addEventListener('input', () => {
+  const query = titleInput.value.trim();
+  clearTimeout(searchDebounceTimer);
+
+  if (query.length < 2) {
+    suggestionsBox.classList.add('hidden');
+    suggestionsBox.innerHTML = '';
+    return;
+  }
+
+  suggestionsBox.classList.remove('hidden');
+  suggestionsBox.innerHTML = '<div class="suggestion-status">🔍 Buscando jogos na IGDB...</div>';
+
+  searchDebounceTimer = setTimeout(async () => {
+    try {
+      const res = await apiFetch(`/api/games/search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error('Erro na busca');
+      currentSuggestions = await res.json();
+
+      if (!currentSuggestions.length) {
+        suggestionsBox.innerHTML = '<div class="suggestion-status">Nenhum jogo encontrado com esse nome.</div>';
+        return;
+      }
+
+      suggestionsBox.innerHTML = currentSuggestions.map((item, idx) => `
+        <div class="suggestion-item" data-index="${idx}">
+          ${item.thumb
+            ? `<img class="suggestion-thumb" src="${escapeHtml(item.thumb)}" alt="">`
+            : `<div class="suggestion-thumb"></div>`}
+          <div class="suggestion-info">
+            <span class="suggestion-name">${escapeHtml(item.name)}</span>
+            <span class="suggestion-meta">
+              ${item.year ? `📅 ${item.year}` : ''} ${item.genre ? `• 🎮 ${escapeHtml(item.genre)}` : ''}
+            </span>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      if (err.message !== 'Sessão expirada') {
+        suggestionsBox.innerHTML = '<div class="suggestion-status">Erro ao buscar sugestões.</div>';
+      }
+    }
+  }, 400);
+});
+
+suggestionsBox.addEventListener('click', (e) => {
+  const itemEl = e.target.closest('.suggestion-item');
+  if (!itemEl) return;
+
+  const selected = currentSuggestions[Number(itemEl.dataset.index)];
+  if (!selected) return;
+
+  titleInput.value = selected.name;
+  if (selected.cover) document.getElementById('cover').value = selected.cover;
+  if (selected.genre && !document.getElementById('genre').value.trim()) {
+    document.getElementById('genre').value = selected.genre;
+  }
+
+  suggestionsBox.classList.add('hidden');
+  showToast(`Selecionado: ${selected.name}`);
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.autocomplete-wrapper')) {
+    suggestionsBox.classList.add('hidden');
+  }
+});
 
 // ===== Gráficos =====
 function renderCharts() {

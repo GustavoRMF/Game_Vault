@@ -114,12 +114,13 @@
             <input type="hidden" id="game-id">
             
             <div class="form-grid">
-              <div class="field">
+              <div class="field autocomplete-wrapper">
                 <label for="title">Título *</label>
                 <div class="input-with-btn">
-                  <input type="text" id="title" required placeholder="Ex: God of War">
+                  <input type="text" id="title" required autocomplete="off" placeholder="Digite o nome do jogo...">
                   <button type="button" id="fetch-cover-btn" title="Buscar capa automaticamente">🔍</button>
                 </div>
+                <div id="title-suggestions" class="suggestions-dropdown hidden"></div>
               </div>
 
               <div class="field">
