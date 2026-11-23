@@ -6,11 +6,11 @@ const ASSETS = [
   './css/auth.css',
   './css/library.css',
   './css/community.css',
+  './css/social.css',
   './wishlist.js',
+  './community.js',
   './app.js',
   './manifest.json',
-  './css/social.css',
-  './community.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
 ];
 
