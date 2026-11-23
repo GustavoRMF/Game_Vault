@@ -824,9 +824,21 @@ function normalizeTitleKey(title) {
 
 app.post('/api/import/psn', authMiddleware, async (req, res) => {
   try {
-    const npsso = String(req.body.npsso || '').trim();
+    let rawInput = String(req.body.npsso || '').trim();
+
+    if (rawInput.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(rawInput);
+        if (parsed.npsso) rawInput = String(parsed.npsso).trim();
+      } catch {
+        const match = rawInput.match(/"npsso"\s*:\s*"([^"]+)"/);
+        if (match) rawInput = match[1].trim();
+      }
+    }
+
+    const npsso = rawInput.replace(/^["']|["']$/g, '').trim();
     if (npsso.length < 30) {
-      return res.status(400).json({ error: 'Token NPSSO inválido. Cole o código de 64 caracteres da Sony.' });
+      return res.status(400).json({ error: 'Token NPSSO inválido. Cole o texto retornado pela Sony.' });
     }
 
     const accessCode = await psn.exchangeNpssoForAccessCode(npsso);
@@ -901,8 +913,9 @@ app.post('/api/import/psn', authMiddleware, async (req, res) => {
     res.json({ imported, skipped, updatedHours, totalFound: playedTitles.length });
   } catch (err) {
     console.error('Erro ao importar PSN:', err);
+    const detail = err?.message ? ` (${err.message})` : '';
     res.status(500).json({
-      error: 'Falha ao conectar na PSN. Verifique se você está logado na PlayStation Store e gerou um novo código NPSSO.'
+      error: `Falha ao conectar na PSN${detail}. Gere um novo código NPSSO na aba logada e tente novamente.`
     });
   }
 });
