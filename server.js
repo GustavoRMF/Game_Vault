@@ -35,7 +35,6 @@ async function initDb() {
     );
   `);
 
-  // Garante compatibilidade com tabelas users criadas em versões anteriores
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS salt TEXT;`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS prefix_hash TEXT;`);
@@ -73,7 +72,6 @@ async function initDb() {
     );
   `);
 
-  // ===== Tabelas Sociais (Mural, Comentários & Chat) =====
   await pool.query(`
     CREATE TABLE IF NOT EXISTS community_posts (
       id TEXT PRIMARY KEY,
@@ -796,14 +794,31 @@ app.post('/api/wishlist/:id/move-to-library', authMiddleware, async (req, res) =
 });
 
 // ===== Importação PlayStation Network (PSN) =====
-function parseIsoDurationHours(iso) {
-  if (!iso || typeof iso !== 'string') return 0;
-  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+function parsePsnDurationHours(duration) {
+  if (duration === null || duration === undefined) return 0;
+
+  // Caso venha numérico (segundos)
+  if (typeof duration === 'number' && Number.isFinite(duration)) {
+    return Math.round((duration / 3600) * 10) / 10;
+  }
+
+  const str = String(duration).trim();
+  if (!str) return 0;
+
+  if (/^\d+(\.\d+)?$/.test(str)) {
+    return Math.round((Number(str) / 3600) * 10) / 10;
+  }
+
+  // Formato ISO-8601 com suporte a dias, horas, minutos e segundos (ex: P2DT4H15M20S ou PT120H30M)
+  const match = str.match(/P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?/i);
   if (!match) return 0;
-  const h = Number(match[1] || 0);
-  const m = Number(match[2] || 0);
-  const s = Number(match[3] || 0);
-  return Math.round((h + m / 60 + s / 3600) * 10) / 10;
+
+  const d = Number(match[1] || 0);
+  const h = Number(match[2] || 0);
+  const m = Number(match[3] || 0);
+  const s = Number(match[4] || 0);
+  const totalHours = d * 24 + h + m / 60 + s / 3600;
+  return Math.round(totalHours * 10) / 10;
 }
 
 function mapPsnPlatform(category) {
@@ -845,11 +860,11 @@ app.post('/api/import/psn', authMiddleware, async (req, res) => {
     const authorization = await psn.exchangeAccessCodeForAuthTokens(accessCode);
 
     const [playedRes, trophyRes] = await Promise.all([
-      psn.getUserPlayedGames(authorization, 'me', { limit: 200 }),
-      psn.getUserTitles(authorization, 'me', { limit: 200 }).catch(() => ({ trophyTitles: [] }))
+      psn.getUserPlayedGames(authorization, 'me', { limit: 250 }),
+      psn.getUserTitles(authorization, 'me', { limit: 250 }).catch(() => ({ trophyTitles: [] }))
     ]);
 
-    const playedTitles = playedRes?.titles || [];
+    const playedTitles = Array.isArray(playedRes?.titles) ? [...playedRes.titles] : [];
     const trophyMap = new Map();
     for (const t of trophyRes?.trophyTitles || []) {
       trophyMap.set(normalizeTitleKey(t.trophyTitleName), t);
@@ -864,17 +879,29 @@ app.post('/api/import/psn', authMiddleware, async (req, res) => {
       existingMap.set(`${normalizeTitleKey(row.title)}|${row.platform}`, row);
     }
 
+    // Ordena do mais recente para o mais antigo com base em lastPlayedDateTime (se existir)
+    playedTitles.sort((a, b) => {
+      const ta = a.lastPlayedDateTime ? Date.parse(a.lastPlayedDateTime) : 0;
+      const tb = b.lastPlayedDateTime ? Date.parse(b.lastPlayedDateTime) : 0;
+      return tb - ta;
+    });
+
     let imported = 0;
     let skipped = 0;
     let updatedHours = 0;
+    const baseTimestamp = Date.now();
 
-    for (const item of playedTitles) {
+    for (let i = 0; i < playedTitles.length; i++) {
+      const item = playedTitles[i];
       const rawTitle = String(item.name || '').trim();
       if (!rawTitle) continue;
 
       const platform = mapPsnPlatform(item.category);
       const key = `${normalizeTitleKey(rawTitle)}|${platform}`;
-      const hours = parseIsoDurationHours(item.playDuration);
+      const hours = parsePsnDurationHours(item.playDuration);
+      const lastPlayedTs = item.lastPlayedDateTime ? Date.parse(item.lastPlayedDateTime) : 0;
+      // Garante que o item mais recente tenha sempre o maior added_at
+      const itemTimestamp = lastPlayedTs > 0 ? lastPlayedTs : (baseTimestamp - i * 1000);
 
       if (existingMap.has(key)) {
         const existing = existingMap.get(key);
@@ -903,7 +930,7 @@ app.post('/api/import/psn', authMiddleware, async (req, res) => {
       await pool.query(
         `INSERT INTO games (id, user_id, title, platform, genre, status, rating, hours, cover, notes, added_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [id, String(req.user.id), rawTitle, platform, '', status, null, hours, cover, 'Importado da PSN', Date.now()]
+        [id, String(req.user.id), rawTitle, platform, '', status, null, hours, cover, 'Importado da PSN', itemTimestamp]
       );
 
       existingMap.set(key, { id, title: rawTitle, platform, hours });

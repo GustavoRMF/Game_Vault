@@ -48,7 +48,6 @@
       <h2 id="auth-title">Entrar no GameVault</h2>
       <p id="auth-subtitle" class="auth-subtitle">Acesse sua biblioteca e dispute o topo do ranking de horas jogadas.</p>
 
-      <!-- Formulário Login / Cadastro -->
       <form id="auth-form" class="auth-form">
         <div class="form-group">
           <label for="auth-username">Usuário</label>
@@ -74,7 +73,6 @@
         </div>
       </form>
 
-      <!-- Formulário Recuperar Senha (3 primeiros dígitos) -->
       <form id="forgot-form" class="auth-form hidden">
         <div class="form-group">
           <label for="forgot-username">Usuário cadastrado</label>
@@ -102,13 +100,13 @@
 
   <!-- ===== Conteúdo Principal (Logado) ===== -->
   <main id="app-content" class="hidden">
-    <!-- Navegação entre Abas -->
     <nav class="main-tabs">
       <button type="button" class="tab-btn active" data-tab="library">📚 Minha Biblioteca</button>
       <button type="button" class="tab-btn" data-tab="wishlist">⭐ Lista de Desejos <span id="wishlist-tab-badge" class="tab-badge">0</span></button>
       <button type="button" class="tab-btn" data-tab="ranking">🏆 Ranking</button>
       <button type="button" class="tab-btn" data-tab="posts">📢 Mural</button>
       <button type="button" class="tab-btn" data-tab="chat">💬 Chat</button>
+      <button type="button" class="tab-btn" data-tab="settings">⚙️ Ajustes</button>
     </nav>
 
     <!-- ================= ABA 1: MINHA BIBLIOTECA ================= -->
@@ -124,29 +122,6 @@
           <h3>Jogos por Status</h3>
           <canvas id="chart-status"></canvas>
         </div>
-      </section>
-
-      <!-- Backup JSON -->
-      <section class="backup-section">
-        <div class="backup-actions">
-          <button type="button" id="export-btn" class="btn-secondary">📤 Exportar Backup (JSON)</button>
-          <label class="btn-secondary file-label">
-            📥 Importar Backup (JSON)
-            <input type="file" id="import-input" accept=".json" hidden>
-          </label>
-        </div>
-        <span id="backup-status" class="backup-status"></span>
-      </section>
-
-      <!-- Sincronização PlayStation Network (PSN) -->
-      <section class="backup-section" style="margin-top: 12px;">
-        <div class="backup-actions" style="flex-wrap: wrap;">
-          <a href="https://www.playstation.com" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;">1️⃣ Abrir PlayStation.com</a>
-          <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;">2️⃣ Pegar código NPSSO</a>
-          <input type="text" id="psn-npsso-input" placeholder="Cole aqui o código npsso (64 caracteres)..." style="flex:1; min-width:220px;">
-          <button type="button" id="import-psn-btn" class="btn-primary">🎮 Sincronizar PSN</button>
-        </div>
-        <span id="psn-status" class="backup-status"></span>
       </section>
 
       <section class="form-section">
@@ -427,6 +402,38 @@
           <input type="text" id="chat-input" maxlength="500" required placeholder="Digite sua mensagem..." autocomplete="off">
           <button type="submit" class="btn-primary">Enviar</button>
         </form>
+      </section>
+    </div>
+
+    <!-- ================= ABA 6: AJUSTES & INTEGRAÇÕES ================= -->
+    <div id="tab-settings" class="tab-content hidden">
+      <section class="form-section" style="margin-top: 0;">
+        <h2>🎮 Sincronizar PlayStation Network (PSN)</h2>
+        <p class="subtitle" style="margin-bottom: 14px;">
+          Importa seus jogos jogados, horas e platinas da PSN sem duplicar itens já cadastrados.
+        </p>
+        <div class="backup-actions" style="flex-wrap: wrap;">
+          <a href="https://www.playstation.com" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;">1️⃣ Abrir PlayStation.com</a>
+          <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;">2️⃣ Pegar código NPSSO</a>
+          <input type="text" id="psn-npsso-input" placeholder="Cole aqui o código npsso ou o JSON completo da Sony..." style="flex:1; min-width:240px;">
+          <button type="button" id="import-psn-btn" class="btn-primary">🎮 Sincronizar PSN</button>
+        </div>
+        <p id="psn-status" class="backup-status" style="margin-top: 10px;"></p>
+      </section>
+
+      <section class="form-section">
+        <h2>💾 Backup e Restauração (JSON)</h2>
+        <p class="subtitle" style="margin-bottom: 14px;">
+          Exporte uma cópia de segurança da sua biblioteca ou importe um arquivo JSON anterior.
+        </p>
+        <div class="backup-actions">
+          <button type="button" id="export-btn" class="btn-secondary">📤 Exportar Backup (JSON)</button>
+          <label class="btn-secondary file-label">
+            📥 Importar Backup (JSON)
+            <input type="file" id="import-input" accept=".json" hidden>
+          </label>
+        </div>
+        <p id="backup-status" class="backup-status" style="margin-top: 10px;"></p>
       </section>
     </div>
   </main>
