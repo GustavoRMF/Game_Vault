@@ -40,7 +40,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS games (
       id TEXT PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
       title TEXT NOT NULL,
       platform TEXT NOT NULL,
       genre TEXT DEFAULT '',
@@ -56,7 +56,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS wishlist (
       id TEXT PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       title TEXT NOT NULL,
       platform TEXT NOT NULL,
       genre TEXT DEFAULT '',
@@ -72,7 +72,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS community_posts (
       id TEXT PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       category VARCHAR(40) DEFAULT 'Geral',
@@ -84,7 +84,7 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS post_comments (
       id TEXT PRIMARY KEY,
       post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       content TEXT NOT NULL,
       created_at BIGINT NOT NULL
     );
@@ -93,7 +93,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS chat_messages (
       id TEXT PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       message TEXT NOT NULL,
       created_at BIGINT NOT NULL
     );
@@ -312,8 +312,8 @@ app.get('/api/ranking', authMiddleware, async (req, res) => {
 
 app.get('/api/users/:id/profile', authMiddleware, async (req, res) => {
   try {
-    const userId = Number(req.params.id);
-    if (!Number.isInteger(userId)) return res.status(400).json({ error: 'ID inválido' });
+    const userId = String(req.params.id || '').trim();
+    if (!userId) return res.status(400).json({ error: 'ID inválido' });
 
     const userRes = await pool.query('SELECT id, username, created_at FROM users WHERE id = $1', [userId]);
     const user = userRes.rows[0];
