@@ -1,8 +1,11 @@
-const CACHE = 'gamevault-v12';
+const CACHE = 'gamevault-v13';
 const ASSETS = [
   './',
   './index.html',
-  './style.css',
+  './css/base.css',
+  './css/auth.css',
+  './css/library.css',
+  './css/community.css',
   './wishlist.js',
   './app.js',
   './manifest.json',
