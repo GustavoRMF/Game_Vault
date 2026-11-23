@@ -854,12 +854,54 @@ document.getElementById('fetch-cover-btn').addEventListener('click', () => {
   fetchCoverToFields(document.getElementById('title').value, 'fetch-cover-btn', 'cover');
 });
 
-// Eventos Backup & Filtros Biblioteca
+// Eventos Backup, PSN & Filtros Biblioteca
 document.getElementById('export-btn').addEventListener('click', exportBackup);
 document.getElementById('import-input').addEventListener('change', (e) => {
   if (e.target.files[0]) importBackup(e.target.files[0]);
   e.target.value = '';
 });
+
+const importPsnBtn = document.getElementById('import-psn-btn');
+if (importPsnBtn) {
+  importPsnBtn.addEventListener('click', async () => {
+    const input = document.getElementById('psn-npsso-input');
+    const statusEl = document.getElementById('psn-status');
+    const npsso = input.value.trim();
+
+    if (!npsso) {
+      showToast('Cole primeiro o código NPSSO da sua conta PlayStation.');
+      return;
+    }
+
+    importPsnBtn.disabled = true;
+    importPsnBtn.textContent = '⏳ Sincronizando PSN...';
+    statusEl.textContent = 'Buscando jogos, horas e troféus na PlayStation Network...';
+
+    try {
+      const res = await apiFetch('/api/import/psn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ npsso })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao importar da PSN');
+
+      input.value = '';
+      await loadGames();
+      render();
+
+      const resumo = `✅ ${data.imported} novo(s), ${data.updatedHours} hora(s) atualizada(s), ${data.skipped} já existente(s) ignorado(s).`;
+      statusEl.textContent = resumo;
+      showToast(`${data.imported} jogo(s) importado(s) da PSN!`);
+    } catch (err) {
+      statusEl.textContent = '';
+      if (err.message !== 'Sessão expirada') showToast(err.message);
+    } finally {
+      importPsnBtn.disabled = false;
+      importPsnBtn.textContent = '🎮 Sincronizar PSN';
+    }
+  });
+}
 
 document.getElementById('search').addEventListener('input', renderGames);
 ['filter-platform', 'filter-status', 'sort-by'].forEach(id => {

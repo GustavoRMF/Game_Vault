@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
 const { Pool } = require('pg');
+const psn = require('psn-api');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -791,6 +792,118 @@ app.post('/api/wishlist/:id/move-to-library', authMiddleware, async (req, res) =
     res.status(500).json({ error: 'Erro ao mover jogo para a biblioteca.' });
   } finally {
     client.release();
+  }
+});
+
+// ===== Importação PlayStation Network (PSN) =====
+function parseIsoDurationHours(iso) {
+  if (!iso || typeof iso !== 'string') return 0;
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  const h = Number(match[1] || 0);
+  const m = Number(match[2] || 0);
+  const s = Number(match[3] || 0);
+  return Math.round((h + m / 60 + s / 3600) * 10) / 10;
+}
+
+function mapPsnPlatform(category) {
+  const c = String(category || '').toLowerCase();
+  if (c.includes('ps5')) return 'PS5';
+  if (c.includes('ps4')) return 'PS4';
+  if (c.includes('ps3')) return 'PS3';
+  return 'PS4';
+}
+
+function normalizeTitleKey(title) {
+  return String(title || '')
+    .toLowerCase()
+    .replace(/[™®©:–—-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+app.post('/api/import/psn', authMiddleware, async (req, res) => {
+  try {
+    const npsso = String(req.body.npsso || '').trim();
+    if (npsso.length < 30) {
+      return res.status(400).json({ error: 'Token NPSSO inválido. Cole o código de 64 caracteres da Sony.' });
+    }
+
+    const accessCode = await psn.exchangeNpssoForAccessCode(npsso);
+    const authorization = await psn.exchangeAccessCodeForAuthTokens(accessCode);
+
+    const [playedRes, trophyRes] = await Promise.all([
+      psn.getUserPlayedGames(authorization, 'me', { limit: 200 }),
+      psn.getUserTitles(authorization, 'me', { limit: 200 }).catch(() => ({ trophyTitles: [] }))
+    ]);
+
+    const playedTitles = playedRes?.titles || [];
+    const trophyMap = new Map();
+    for (const t of trophyRes?.trophyTitles || []) {
+      trophyMap.set(normalizeTitleKey(t.trophyTitleName), t);
+    }
+
+    const existingRes = await pool.query(
+      'SELECT id, title, platform, hours FROM games WHERE user_id::text = $1',
+      [String(req.user.id)]
+    );
+    const existingMap = new Map();
+    for (const row of existingRes.rows) {
+      existingMap.set(`${normalizeTitleKey(row.title)}|${row.platform}`, row);
+    }
+
+    let imported = 0;
+    let skipped = 0;
+    let updatedHours = 0;
+
+    for (const item of playedTitles) {
+      const rawTitle = String(item.name || '').trim();
+      if (!rawTitle) continue;
+
+      const platform = mapPsnPlatform(item.category);
+      const key = `${normalizeTitleKey(rawTitle)}|${platform}`;
+      const hours = parseIsoDurationHours(item.playDuration);
+
+      if (existingMap.has(key)) {
+        const existing = existingMap.get(key);
+        if (hours > Number(existing.hours || 0)) {
+          await pool.query('UPDATE games SET hours = $1 WHERE id = $2', [hours, existing.id]);
+          updatedHours++;
+        } else {
+          skipped++;
+        }
+        continue;
+      }
+
+      const trophyInfo = trophyMap.get(normalizeTitleKey(rawTitle));
+      let status = hours > 0 ? 'Jogando' : 'Não iniciado';
+      if (trophyInfo) {
+        if (trophyInfo.progress === 100 || (trophyInfo.earnedTrophies?.platinum || 0) > 0) {
+          status = '100%';
+        } else if ((trophyInfo.progress || 0) > 0 || hours > 0) {
+          status = 'Jogando';
+        }
+      }
+
+      const cover = item.imageUrl || trophyInfo?.trophyTitleIconUrl || '';
+      const id = genId();
+
+      await pool.query(
+        `INSERT INTO games (id, user_id, title, platform, genre, status, rating, hours, cover, notes, added_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [id, String(req.user.id), rawTitle, platform, '', status, null, hours, cover, 'Importado da PSN', Date.now()]
+      );
+
+      existingMap.set(key, { id, title: rawTitle, platform, hours });
+      imported++;
+    }
+
+    res.json({ imported, skipped, updatedHours, totalFound: playedTitles.length });
+  } catch (err) {
+    console.error('Erro ao importar PSN:', err);
+    res.status(500).json({
+      error: 'Falha ao conectar na PSN. Verifique se você está logado na PlayStation Store e gerou um novo código NPSSO.'
+    });
   }
 });
 
