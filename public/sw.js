@@ -1,4 +1,4 @@
-const CACHE = 'gamevault-v15';
+const CACHE = 'gamevault-v16';
 const ASSETS = [
   './',
   './index.html',
