@@ -617,6 +617,18 @@ function renderCharts() {
     if (statusCount[g.status] !== undefined) statusCount[g.status]++;
   });
 
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '62%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { color: '#eaeaea', padding: 12, boxWidth: 12 }
+      }
+    }
+  };
+
   const colors = ['#003791', '#0070d1', '#0057ff', '#107c10'];
   const ctxP = document.getElementById('chart-platforms');
   if (charts.platforms) charts.platforms.destroy();
@@ -626,11 +638,7 @@ function renderCharts() {
       labels: Object.keys(platformCount),
       datasets: [{ data: Object.values(platformCount), backgroundColor: colors, borderWidth: 0 }]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { position: 'bottom', labels: { color: '#eaeaea', padding: 12 } } }
-    }
+    options: commonOptions
   });
 
   const statusColors = ['#9ca3af', '#4ade80', '#60a5fa', '#facc15', '#f87171'];
@@ -642,11 +650,7 @@ function renderCharts() {
       labels: Object.keys(statusCount),
       datasets: [{ data: Object.values(statusCount), backgroundColor: statusColors, borderWidth: 0 }]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: { legend: { position: 'bottom', labels: { color: '#eaeaea', padding: 12 } } }
-    }
+    options: commonOptions
   });
 }
 
