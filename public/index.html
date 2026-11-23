@@ -3,405 +3,143 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GameVault - Biblioteca & Comunidade</title>
+  <meta name="theme-color" content="#003791">
+  <title>GameVault - Biblioteca, Ranking & Comunidade</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/library.css">
   <link rel="stylesheet" href="css/community.css">
   <link rel="stylesheet" href="css/social.css">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0b0f19">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <header>
-    <div id="header-covers-bg" class="header-covers-bg"></div>
-    <div class="header-content">
-      <h1>🎮 GameVault</h1>
-      <p>Sua biblioteca, conquistas, ranking e comunidade gamer</p>
-      <button id="install-btn" class="btn-install hidden">📲 Instalar App</button>
+    <div id="header-covers-bg" class="header-covers-bg" aria-hidden="true"></div>
+    <div class="header-overlay" aria-hidden="true"></div>
 
-      <!-- Barra do Usuário Logado + Navegação por Abas -->
-      <div id="user-bar" class="user-bar hidden">
-        <div class="user-badge">
-          <span>👤 <strong id="current-username">Jogador</strong></span>
-          <button type="button" id="logout-btn" class="btn-logout">Sair</button>
+    <div class="header-content">
+      <div class="header-top">
+        <div>
+          <h1>🎮 GameVault</h1>
+          <p class="subtitle">Biblioteca PS3 • PS4 • PS5 • PC • Ranking & Comunidade</p>
         </div>
 
-        <nav class="tabs-nav">
-          <button type="button" class="tab-btn active" data-tab="library">🎮 Biblioteca</button>
-          <button type="button" class="tab-btn" data-tab="wishlist">⭐ Desejos</button>
-          <button type="button" class="tab-btn" data-tab="ranking">🏆 Ranking</button>
-          <button type="button" class="tab-btn" data-tab="posts">📢 Mural</button>
-          <button type="button" class="tab-btn" data-tab="chat">💬 Chat</button>
-          <button type="button" class="tab-btn" data-tab="settings">⚙️ Configurações</button>
-        </nav>
+        <div class="header-actions">
+          <div id="user-bar" class="user-bar hidden">
+            <span class="user-pill">👤 <strong id="current-username"></strong></span>
+            <button type="button" id="logout-btn" class="btn-secondary btn-small">Sair</button>
+          </div>
+          <button id="install-btn" class="install-btn hidden">📲 Instalar App</button>
+        </div>
       </div>
     </div>
   </header>
 
-  <main>
-    <!-- ==================== TELA DE LOGIN / CADASTRO 3D GAMER ==================== -->
-    <div id="auth-wrapper" class="auth-3d-stage">
-      <section id="auth-section" class="auth-card gamer-3d-panel">
-        <div class="gamer-glow-ring"></div>
-        <div class="auth-panel-inner">
-          <div class="auth-tabs">
-            <button type="button" class="auth-tab-btn active" data-auth="login">🔑 Entrar</button>
-            <button type="button" class="auth-tab-btn" data-auth="register">✨ Criar Conta</button>
+  <!-- ===== Tela de Login / Cadastro / Recuperação ===== -->
+  <section id="auth-wrapper" class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab-btn active" data-auth="login">🔑 Entrar</button>
+        <button type="button" class="auth-tab-btn" data-auth="register">✨ Criar Conta</button>
+      </div>
+
+      <h2 id="auth-title">Entrar no GameVault</h2>
+      <p id="auth-subtitle" class="auth-subtitle">Acesse sua biblioteca e dispute o topo do ranking de horas jogadas.</p>
+
+      <!-- Formulário Login / Cadastro -->
+      <form id="auth-form" class="auth-form">
+        <div class="form-group">
+          <label for="auth-username">Usuário</label>
+          <input type="text" id="auth-username" required minlength="3" maxlength="30" autocomplete="username" placeholder="Ex: GustavoGamer">
+        </div>
+
+        <div class="form-group">
+          <div class="label-row">
+            <label for="auth-password">Senha</label>
+            <span id="password-rule-badge" class="rule-badge hidden">Mínimo 8 dígitos</span>
           </div>
+          <input type="password" id="auth-password" required minlength="4" autocomplete="current-password" placeholder="Digite sua senha">
+        </div>
 
-          <h2 id="auth-title">Entrar no GameVault</h2>
-          <p id="auth-subtitle" class="settings-desc">Acesse sua biblioteca e dispute o topo do ranking de horas jogadas.</p>
+        <p id="register-tip" class="register-tip hidden">
+          💡 <strong>Dica:</strong> Guarde os <strong>3 primeiros dígitos</strong> da sua senha — você poderá usá-los caso precise redefini-la depois.
+        </p>
 
-          <form id="auth-form" class="auth-form">
-            <div class="field">
-              <label for="auth-username">Nome de Usuário</label>
-              <input type="text" id="auth-username" required minlength="3" maxlength="30" placeholder="Ex: Nome">
-            </div>
+        <button type="submit" id="auth-submit-btn" class="btn-primary auth-submit">Entrar na Conta</button>
 
-            <div class="field">
-              <label for="auth-password">Senha <span id="password-rule-badge" class="rule-hint hidden">(mín. 8 dígitos)</span></label>
-              <input type="password" id="auth-password" required minlength="8" placeholder="Mínimo 8 dígitos">
-            </div>
+        <div id="forgot-link-box" class="forgot-link-box">
+          <button type="button" id="open-forgot-btn" class="link-btn">Esqueci minha senha</button>
+        </div>
+      </form>
 
-            <div id="register-tip" class="security-tip hidden">
-              🛡️ <strong>Dica de Segurança:</strong> Guarde bem os <strong>3 primeiros dígitos</strong> da sua senha. Você precisará deles caso esqueça a senha!
-            </div>
+      <!-- Formulário Recuperar Senha (3 primeiros dígitos) -->
+      <form id="forgot-form" class="auth-form hidden">
+        <div class="form-group">
+          <label for="forgot-username">Usuário cadastrado</label>
+          <input type="text" id="forgot-username" required minlength="3" maxlength="30" placeholder="Seu nome de usuário">
+        </div>
 
-            <button type="submit" id="auth-submit-btn" class="btn-primary full-btn gamer-btn-pulse">Entrar na Conta</button>
+        <div class="form-group">
+          <label for="forgot-first-three">3 primeiros dígitos da senha atual</label>
+          <input type="text" id="forgot-first-three" required minlength="3" maxlength="3" placeholder="Ex: 123 ou abc">
+        </div>
 
-            <div id="forgot-link-box" class="forgot-box">
-              <button type="button" id="open-forgot-btn" class="btn-link">🔓 Esqueceu a senha?</button>
-            </div>
-          </form>
+        <div class="form-group">
+          <label for="forgot-new-password">Nova senha (mínimo 8 dígitos)</label>
+          <input type="password" id="forgot-new-password" required minlength="8" autocomplete="new-password" placeholder="Digite a nova senha">
+        </div>
 
-          <form id="forgot-form" class="auth-form hidden">
-            <div class="field">
-              <label for="forgot-username">Nome de Usuário</label>
-              <input type="text" id="forgot-username" required minlength="3" maxlength="30" placeholder="Ex: Nome">
-            </div>
+        <button type="submit" id="forgot-submit-btn" class="btn-primary auth-submit">Redefinir Senha e Entrar</button>
 
-            <div class="field">
-              <label for="forgot-first-three">3 primeiros dígitos da senha cadastrada</label>
-              <input type="text" id="forgot-first-three" required minlength="3" maxlength="3" placeholder="Ex: 123 ou abc">
-            </div>
+        <div class="forgot-link-box">
+          <button type="button" id="back-to-login-btn" class="link-btn">← Voltar para o login</button>
+        </div>
+      </form>
+    </div>
+  </section>
 
-            <div class="field">
-              <label for="forgot-new-password">Nova Senha (mín. 8 dígitos)</label>
-              <input type="password" id="forgot-new-password" required minlength="8" placeholder="Digite a nova senha">
-            </div>
+  <!-- ===== Conteúdo Principal (Logado) ===== -->
+  <main id="app-content" class="hidden">
+    <!-- Navegação entre Abas -->
+    <nav class="main-tabs">
+      <button type="button" class="tab-btn active" data-tab="library">📚 Minha Biblioteca</button>
+      <button type="button" class="tab-btn" data-tab="wishlist">⭐ Lista de Desejos <span id="wishlist-tab-badge" class="tab-badge">0</span></button>
+      <button type="button" class="tab-btn" data-tab="ranking">🏆 Ranking</button>
+      <button type="button" class="tab-btn" data-tab="posts">📢 Mural</button>
+      <button type="button" class="tab-btn" data-tab="chat">💬 Chat</button>
+    </nav>
 
-            <button type="submit" id="forgot-submit-btn" class="btn-primary full-btn">Redefinir Senha e Entrar</button>
+    <!-- ================= ABA 1: MINHA BIBLIOTECA ================= -->
+    <div id="tab-library" class="tab-content">
+      <section class="stats" id="stats"></section>
 
-            <div class="forgot-box">
-              <button type="button" id="back-to-login-btn" class="btn-link">← Voltar para o Login</button>
-            </div>
-          </form>
+      <section class="charts-section">
+        <div class="chart-card">
+          <h3>Jogos por Plataforma</h3>
+          <canvas id="chart-platforms"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Jogos por Status</h3>
+          <canvas id="chart-status"></canvas>
         </div>
       </section>
-    </div>
 
-    <!-- ==================== CONTEÚDO LOGADO ==================== -->
-    <div id="app-content" class="hidden">
+      <!-- Backup JSON -->
+      <section class="backup-section">
+        <div class="backup-actions">
+          <button type="button" id="export-btn" class="btn-secondary">📤 Exportar Backup (JSON)</button>
+          <label class="btn-secondary file-label">
+            📥 Importar Backup (JSON)
+            <input type="file" id="import-input" accept=".json" hidden>
+          </label>
+        </div>
+        <span id="backup-status" class="backup-status"></span>
+      </section>
 
-      <!-- ABA 1: BIBLIOTECA -->
-      <div id="tab-library" class="tab-content active">
-        <section class="charts-section">
-          <h2>📊 Estatísticas Visuais</h2>
-          <div class="charts-grid">
-            <div class="chart-box"><canvas id="chart-platforms"></canvas></div>
-            <div class="chart-box"><canvas id="chart-status"></canvas></div>
-          </div>
-        </section>
-
-        <section class="form-section">
-          <h2 id="form-title">➕ Adicionar Jogo</h2>
-          <form id="game-form">
-            <input type="hidden" id="game-id">
-            
-            <div class="form-grid">
-              <div class="field autocomplete-wrapper">
-                <label for="title">Título *</label>
-                <div class="input-with-btn">
-                  <input type="text" id="title" required autocomplete="off" placeholder="Digite o nome do jogo...">
-                  <button type="button" id="fetch-cover-btn" title="Buscar capa automaticamente">🔍</button>
-                </div>
-                <div id="title-suggestions" class="suggestions-dropdown hidden"></div>
-              </div>
-
-              <div class="field">
-                <label for="platform">Plataforma *</label>
-                <select id="platform" required>
-                  <option value="">Selecione...</option>
-                  <option value="PS3">PS3</option>
-                  <option value="PS4">PS4</option>
-                  <option value="PS5">PS5</option>
-                  <option value="PC">PC</option>
-                </select>
-              </div>
-
-              <div class="field">
-                <label for="genre">Gênero</label>
-                <input type="text" id="genre" placeholder="Ex: Ação, RPG...">
-              </div>
-
-              <div class="field">
-                <label for="status">Status *</label>
-                <select id="status" required>
-                  <option value="Não iniciado">Não iniciado</option>
-                  <option value="Jogando">Jogando</option>
-                  <option value="Zerado">Zerado</option>
-                  <option value="100%">100% / Platinado</option>
-                  <option value="Abandonado">Abandonado</option>
-                </select>
-              </div>
-
-              <div class="field">
-                <label for="rating">Nota (0-10)</label>
-                <input type="number" id="rating" min="0" max="10" step="0.5" placeholder="8.5">
-              </div>
-
-              <div class="field">
-                <label for="hours">Horas jogadas</label>
-                <input type="number" id="hours" min="0" step="0.5" placeholder="0">
-              </div>
-
-              <div class="field full">
-                <label for="cover">URL da Capa</label>
-                <input type="url" id="cover" placeholder="https://... (ou use o botão 🔍)">
-              </div>
-
-              <div class="field full">
-                <label for="notes">Observações</label>
-                <textarea id="notes" rows="2" placeholder="Comentários, dicas, troféus..."></textarea>
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">Salvar Jogo</button>
-              <button type="button" id="cancel-edit" class="btn-secondary hidden">Cancelar</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="filters">
-          <input type="search" id="search" placeholder="🔍 Buscar por título...">
-          <select id="filter-platform">
-            <option value="">Todas plataformas</option>
-            <option value="PS3">PS3</option>
-            <option value="PS4">PS4</option>
-            <option value="PS5">PS5</option>
-            <option value="PC">PC</option>
-          </select>
-          <select id="filter-status">
-            <option value="">Todos status</option>
-            <option value="Não iniciado">Não iniciado</option>
-            <option value="Jogando">Jogando</option>
-            <option value="Zerado">Zerado</option>
-            <option value="100%">100% / Platinado</option>
-            <option value="Abandonado">Abandonado</option>
-          </select>
-          <select id="sort-by">
-            <option value="added-desc">Mais recentes</option>
-            <option value="added-asc">Mais antigos</option>
-            <option value="title-asc">Título (A-Z)</option>
-            <option value="title-desc">Título (Z-A)</option>
-            <option value="rating-desc">Melhor nota</option>
-            <option value="hours-desc">Mais horas</option>
-          </select>
-        </section>
-
-        <section class="stats" id="stats"></section>
-
-        <section class="games-section">
-          <h2>📚 Biblioteca <span id="game-count"></span></h2>
-          <div id="games-list" class="games-grid"></div>
-          <p id="empty-msg" class="empty-msg">Nenhum jogo cadastrado ainda. Adicione seu primeiro jogo! 🎮</p>
-        </section>
-      </div>
-
-      <!-- ABA 2: LISTA DE DESEJOS -->
-      <div id="tab-wishlist" class="tab-content hidden">
-        <section class="form-section" id="wish-form-section">
-          <h2 id="wish-form-title">⭐ Adicionar à Lista de Desejos</h2>
-          <form id="wish-form">
-            <input type="hidden" id="wish-id">
-
-            <div class="form-grid">
-              <div class="field autocomplete-wrapper">
-                <label for="wish-title">Título *</label>
-                <div class="input-with-btn">
-                  <input type="text" id="wish-title" required autocomplete="off" placeholder="Digite o jogo desejado...">
-                  <button type="button" id="wish-fetch-cover-btn" title="Buscar capa automaticamente">🔍</button>
-                </div>
-                <div id="wish-suggestions" class="suggestions-dropdown hidden"></div>
-              </div>
-
-              <div class="field">
-                <label for="wish-platform">Plataforma *</label>
-                <select id="wish-platform" required>
-                  <option value="">Selecione...</option>
-                  <option value="PS3">PS3</option>
-                  <option value="PS4">PS4</option>
-                  <option value="PS5">PS5</option>
-                  <option value="PC">PC</option>
-                </select>
-              </div>
-
-              <div class="field">
-                <label for="wish-genre">Gênero</label>
-                <input type="text" id="wish-genre" placeholder="Ex: Ação, RPG...">
-              </div>
-
-              <div class="field">
-                <label for="wish-priority">Prioridade *</label>
-                <select id="wish-priority" required>
-                  <option value="Alta">🔥 Alta (Comprar logo)</option>
-                  <option value="Média" selected>⭐ Média</option>
-                  <option value="Baixa">❄️ Baixa (Esperar promoção)</option>
-                </select>
-              </div>
-
-              <div class="field">
-                <label for="wish-price">Preço Alvo (R$)</label>
-                <input type="number" id="wish-price" min="0" step="0.01" placeholder="Ex: 149.90">
-              </div>
-
-              <div class="field">
-                <label for="wish-cover">URL da Capa</label>
-                <input type="url" id="wish-cover" placeholder="https://... (ou use o botão 🔍)">
-              </div>
-
-              <div class="field full">
-                <label for="wish-notes">Observações / Onde comprar</label>
-                <textarea id="wish-notes" rows="2" placeholder="Ex: Esperar promoção na PSN / Steam, edição deluxe..."></textarea>
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">Salvar na Lista de Desejos</button>
-              <button type="button" id="wish-cancel-edit" class="btn-secondary hidden">Cancelar</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="filters wish-filters">
-          <input type="search" id="wish-search" placeholder="🔍 Filtrar desejos por título...">
-          <select id="wish-filter-platform">
-            <option value="">Todas plataformas</option>
-            <option value="PS3">PS3</option>
-            <option value="PS4">PS4</option>
-            <option value="PS5">PS5</option>
-            <option value="PC">PC</option>
-          </select>
-          <select id="wish-filter-priority">
-            <option value="">Todas prioridades</option>
-            <option value="Alta">🔥 Alta</option>
-            <option value="Média">⭐ Média</option>
-            <option value="Baixa">❄️ Baixa</option>
-          </select>
-        </section>
-
-        <section class="stats" id="wish-stats"></section>
-
-        <section class="games-section">
-          <h2>⭐ Meus Desejos <span id="wish-count"></span></h2>
-          <div id="wish-list" class="games-grid"></div>
-          <p id="wish-empty-msg" class="empty-msg">Sua lista de desejos está vazia. Adicione os próximos jogos que você quer jogar! ⭐</p>
-        </section>
-      </div>
-
-      <!-- ABA 3: RANKING / PERFIS -->
-      <div id="tab-ranking" class="tab-content hidden">
-        <section class="ranking-section">
-          <div class="ranking-header">
-            <h2>🏆 Ranking de Jogadores</h2>
-            <button type="button" id="refresh-ranking-btn" class="btn-secondary">🔄 Atualizar</button>
-          </div>
-          <p class="settings-desc">
-            Clique em qualquer jogador abaixo para visualizar o perfil e os jogos cadastrados por ele.
-          </p>
-
-          <div id="ranking-podium" class="podium-grid"></div>
-          <div id="ranking-list" class="ranking-list"></div>
-        </section>
-      </div>
-
-      <!-- ABA 4: MURAL DE INFORMAÇÕES -->
-      <div id="tab-posts" class="tab-content hidden">
-        <section>
-          <h2>📢 Publicar no Mural da Comunidade</h2>
-          <form id="post-form">
-            <div class="form-grid">
-              <div class="field">
-                <label for="post-title">Título da Publicação *</label>
-                <input type="text" id="post-title" required maxlength="120" placeholder="Ex: Promoção na PSN, Dica de platina...">
-              </div>
-
-              <div class="field">
-                <label for="post-category">Categoria</label>
-                <select id="post-category">
-                  <option value="Geral">📢 Geral</option>
-                  <option value="Dicas & Guias">🎯 Dicas & Guias</option>
-                  <option value="Promoções">💰 Promoções</option>
-                  <option value="Review">⭐ Review / Opinião</option>
-                </select>
-              </div>
-
-              <div class="field full">
-                <label for="post-content">Mensagem *</label>
-                <textarea id="post-content" rows="3" required maxlength="2000" placeholder="Escreva uma informação, novidade ou dica para todos os jogadores..."></textarea>
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">Publicar para Todos</button>
-            </div>
-          </form>
-        </section>
-
-        <section>
-          <h2>📰 Publicações da Comunidade</h2>
-          <div id="posts-list" class="posts-list"></div>
-          <p id="posts-empty-msg" class="empty-msg hidden">Nenhuma publicação ainda. Compartilhe algo com a galera! 📢</p>
-        </section>
-      </div>
-
-      <!-- ABA 5: CHAT DA COMUNIDADE -->
-      <div id="tab-chat" class="tab-content hidden">
-        <section>
-          <h2>💬 Chat Geral dos Jogadores</h2>
-          <p class="settings-desc">Converse com os jogadores online, combine partidas ou troque ideias sobre jogos.</p>
-
-          <div id="chat-messages" class="chat-box"></div>
-
-          <form id="chat-form" class="chat-form">
-            <input type="text" id="chat-input" maxlength="500" required autocomplete="off" placeholder="Digite sua mensagem...">
-            <button type="submit" class="btn-primary">Enviar</button>
-          </form>
-        </section>
-      </div>
-
-      <!-- ABA 6: CONFIGURAÇÕES -->
-      <div id="tab-settings" class="tab-content hidden">
-        <section class="backup-section">
-          <h2>💾 Backup e Restauração</h2>
-          <p class="settings-desc">
-            Exporte uma cópia de segurança dos seus jogos em formato JSON ou restaure jogos salvos na sua conta.
-          </p>
-          <div class="backup-actions">
-            <button id="export-btn" class="btn-primary">📤 Exportar Backup (JSON)</button>
-            <label class="btn-secondary file-label">
-              📥 Importar Backup (JSON)
-              <input type="file" id="import-input" accept=".json" hidden>
-            </label>
-            <span id="backup-status" class="backup-status"></span>
-          </div>
-        </section>
-
-        <section class="backup-section" style="margin-top: 12px;">
+      <!-- Sincronização PlayStation Network (PSN) -->
+      <section class="backup-section" style="margin-top: 12px;">
         <div class="backup-actions" style="flex-wrap: wrap;">
           <a href="https://www.playstation.com" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;">1️⃣ Abrir PlayStation.com</a>
           <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;">2️⃣ Pegar código NPSSO</a>
@@ -411,31 +149,300 @@
         <span id="psn-status" class="backup-status"></span>
       </section>
 
-        <section class="info-section">
-          <h2>☁️ Sincronização e Sistema</h2>
-          <p class="settings-desc">
-            Seus dados estão vinculados à sua conta na nuvem com PostgreSQL (Neon) e capas integradas via IGDB.
-          </p>
-          <div class="settings-meta">
-            <span class="badge">Versão 4.0 (Biblioteca + Wishlist + Ranking + Mural + Chat)</span>
-            <span class="badge status-Jogando">● Banco Online</span>
-          </div>
-        </section>
-      </div>
+      <section class="form-section">
+        <h2 id="form-title">➕ Adicionar Jogo</h2>
+        <form id="game-form">
+          <input type="hidden" id="game-id">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="title">Título do Jogo *</label>
+              <div class="autocomplete-wrapper">
+                <input type="text" id="title" required autocomplete="off" placeholder="Digite para buscar na IGDB (Ex: God of War)">
+                <div id="title-suggestions" class="suggestions-dropdown hidden"></div>
+              </div>
+            </div>
 
+            <div class="form-group">
+              <label for="platform">Plataforma *</label>
+              <select id="platform" required>
+                <option value="">Selecione...</option>
+                <option value="PS3">PS3</option>
+                <option value="PS4">PS4</option>
+                <option value="PS5">PS5</option>
+                <option value="PC">PC</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="genre">Gênero</label>
+              <input type="text" id="genre" placeholder="Ex: Ação, RPG, Aventura">
+            </div>
+
+            <div class="form-group">
+              <label for="status">Status *</label>
+              <select id="status" required>
+                <option value="Não iniciado">Não iniciado</option>
+                <option value="Jogando">Jogando</option>
+                <option value="Zerado">Zerado</option>
+                <option value="100%">100% (Platinado)</option>
+                <option value="Abandonado">Abandonado</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="rating">Nota (0 a 10)</label>
+              <input type="number" id="rating" min="0" max="10" step="0.5" placeholder="Ex: 9.5">
+            </div>
+
+            <div class="form-group">
+              <label for="hours">Horas Jogadas</label>
+              <input type="number" id="hours" min="0" step="0.5" placeholder="Ex: 42">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="cover">URL da Capa (opcional)</label>
+              <div class="input-with-btn">
+                <input type="url" id="cover" placeholder="https://...">
+                <button type="button" id="fetch-cover-btn" class="btn-secondary" title="Buscar capa automaticamente">🔍</button>
+              </div>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="notes">Anotações</label>
+              <textarea id="notes" rows="2" placeholder="Comentários, troféus faltando, DLCs..."></textarea>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">Salvar Jogo</button>
+            <button type="button" id="cancel-edit" class="btn-secondary hidden">Cancelar</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="filters-section">
+        <input type="text" id="search" placeholder="🔍 Buscar por título...">
+        <select id="filter-platform">
+          <option value="">Todas as plataformas</option>
+          <option value="PS3">PS3</option>
+          <option value="PS4">PS4</option>
+          <option value="PS5">PS5</option>
+          <option value="PC">PC</option>
+        </select>
+        <select id="filter-status">
+          <option value="">Todos os status</option>
+          <option value="Não iniciado">Não iniciado</option>
+          <option value="Jogando">Jogando</option>
+          <option value="Zerado">Zerado</option>
+          <option value="100%">100%</option>
+          <option value="Abandonado">Abandonado</option>
+        </select>
+        <select id="sort-by">
+          <option value="added-desc">Mais recentes</option>
+          <option value="added-asc">Mais antigos</option>
+          <option value="title-asc">Título (A-Z)</option>
+          <option value="title-desc">Título (Z-A)</option>
+          <option value="rating-desc">Maior nota</option>
+          <option value="hours-desc">Mais horas</option>
+        </select>
+      </section>
+
+      <section class="games-section">
+        <h2>Minha Biblioteca <span id="game-count">(0)</span></h2>
+        <div id="games-list" class="games-grid"></div>
+        <p id="empty-msg" class="empty-msg">Nenhum jogo cadastrado ainda. Adicione seu primeiro jogo! 🎮</p>
+      </section>
+    </div>
+
+    <!-- ================= ABA 2: LISTA DE DESEJOS ================= -->
+    <div id="tab-wishlist" class="tab-content hidden">
+      <section class="stats" id="wishlist-stats"></section>
+
+      <section class="form-section">
+        <h2 id="wish-form-title">⭐ Adicionar à Lista de Desejos</h2>
+        <form id="wishlist-form">
+          <input type="hidden" id="wish-id">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="wish-title">Título do Jogo *</label>
+              <div class="autocomplete-wrapper">
+                <input type="text" id="wish-title" required autocomplete="off" placeholder="Digite para buscar na IGDB (Ex: GTA VI)">
+                <div id="wish-suggestions" class="suggestions-dropdown hidden"></div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="wish-platform">Plataforma Desejada *</label>
+              <select id="wish-platform" required>
+                <option value="">Selecione...</option>
+                <option value="PS3">PS3</option>
+                <option value="PS4">PS4</option>
+                <option value="PS5">PS5</option>
+                <option value="PC">PC</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="wish-genre">Gênero</label>
+              <input type="text" id="wish-genre" placeholder="Ex: Ação, RPG, Terror">
+            </div>
+
+            <div class="form-group">
+              <label for="wish-priority">Prioridade</label>
+              <select id="wish-priority">
+                <option value="Alta">🔥 Alta</option>
+                <option value="Média" selected>⚡ Média</option>
+                <option value="Baixa">💤 Baixa</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="wish-price">Preço Alvo (R$)</label>
+              <input type="number" id="wish-price" min="0" step="0.01" placeholder="Ex: 149.90">
+            </div>
+
+            <div class="form-group">
+              <label for="wish-cover">URL da Capa (opcional)</label>
+              <div class="input-with-btn">
+                <input type="url" id="wish-cover" placeholder="https://...">
+                <button type="button" id="wish-fetch-cover-btn" class="btn-secondary" title="Buscar capa automaticamente">🔍</button>
+              </div>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="wish-notes">Observações</label>
+              <textarea id="wish-notes" rows="2" placeholder="Aguardar promoção na PS Store / Steam, edição deluxe..."></textarea>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">Salvar na Lista</button>
+            <button type="button" id="wish-cancel-edit" class="btn-secondary hidden">Cancelar</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="filters-section">
+        <input type="text" id="wish-search" placeholder="🔍 Buscar na lista de desejos...">
+        <select id="wish-filter-platform">
+          <option value="">Todas as plataformas</option>
+          <option value="PS3">PS3</option>
+          <option value="PS4">PS4</option>
+          <option value="PS5">PS5</option>
+          <option value="PC">PC</option>
+        </select>
+        <select id="wish-filter-priority">
+          <option value="">Todas as prioridades</option>
+          <option value="Alta">🔥 Alta</option>
+          <option value="Média">⚡ Média</option>
+          <option value="Baixa">💤 Baixa</option>
+        </select>
+        <select id="wish-sort-by">
+          <option value="priority-desc">Maior prioridade</option>
+          <option value="added-desc">Mais recentes</option>
+          <option value="title-asc">Título (A-Z)</option>
+          <option value="price-asc">Menor preço alvo</option>
+        </select>
+      </section>
+
+      <section class="games-section">
+        <h2>Minha Lista de Desejos <span id="wishlist-count">(0)</span></h2>
+        <div id="wishlist-list" class="games-grid"></div>
+        <p id="wishlist-empty-msg" class="empty-msg">Sua lista de desejos está vazia. Adicione jogos que pretende comprar! ⭐</p>
+      </section>
+    </div>
+
+    <!-- ================= ABA 3: RANKING DE JOGADORES ================= -->
+    <div id="tab-ranking" class="tab-content hidden">
+      <section class="ranking-header-card">
+        <div>
+          <h2>🏆 Ranking da Comunidade GameVault</h2>
+          <p class="subtitle">Dispute o topo acumulando horas jogadas, zeramentos e platinas! Clique em qualquer jogador para ver a biblioteca dele.</p>
+        </div>
+        <button type="button" id="refresh-ranking-btn" class="btn-secondary">🔄 Atualizar Ranking</button>
+      </section>
+
+      <section id="ranking-podium" class="ranking-podium"></section>
+
+      <section class="games-section">
+        <h2>Classificação Geral</h2>
+        <div id="ranking-list" class="ranking-list"></div>
+      </section>
+    </div>
+
+    <!-- ================= ABA 4: MURAL DA COMUNIDADE ================= -->
+    <div id="tab-posts" class="tab-content hidden">
+      <section class="form-section">
+        <h2>📢 Publicar no Mural</h2>
+        <form id="post-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="post-title">Título *</label>
+              <input type="text" id="post-title" required maxlength="120" placeholder="Ex: Promoção imperdível na PS Store!">
+            </div>
+            <div class="form-group">
+              <label for="post-category">Categoria</label>
+              <select id="post-category">
+                <option value="Geral">💬 Geral</option>
+                <option value="Dica">💡 Dica / Guia</option>
+                <option value="Promoção">🏷️ Promoção</option>
+                <option value="Review">⭐ Review</option>
+                <option value="Co-op">🎮 Procurando Co-op</option>
+              </select>
+            </div>
+            <div class="form-group full-width">
+              <label for="post-content">Mensagem *</label>
+              <textarea id="post-content" rows="3" required maxlength="2000" placeholder="Compartilhe novidades, dicas de troféus ou recomendações com a galera..."></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">Publicar no Mural</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="games-section">
+        <div class="section-header-row">
+          <h2>Publicações Recentes</h2>
+          <button type="button" id="refresh-posts-btn" class="btn-secondary btn-small">🔄 Atualizar</button>
+        </div>
+        <div id="posts-list" class="posts-list"></div>
+      </section>
+    </div>
+
+    <!-- ================= ABA 5: CHAT GLOBAL ================= -->
+    <div id="tab-chat" class="tab-content hidden">
+      <section class="chat-card">
+        <div class="chat-header">
+          <div>
+            <h2>💬 Chat da Comunidade</h2>
+            <p class="subtitle">Converse em tempo real com outros jogadores do GameVault.</p>
+          </div>
+          <button type="button" id="refresh-chat-btn" class="btn-secondary btn-small">🔄 Atualizar</button>
+        </div>
+
+        <div id="chat-messages" class="chat-messages"></div>
+
+        <form id="chat-form" class="chat-form">
+          <input type="text" id="chat-input" maxlength="500" required placeholder="Digite sua mensagem..." autocomplete="off">
+          <button type="submit" class="btn-primary">Enviar</button>
+        </form>
+      </section>
     </div>
   </main>
 
-  <!-- Modal de Perfil Público de Outro Jogador -->
-  <div id="player-profile-modal" class="profile-modal hidden">
-    <div class="profile-modal-card">
-      <div class="profile-modal-header">
-        <h2 id="profile-modal-title" style="margin:0;">🎮 Perfil do Jogador</h2>
-        <button type="button" id="close-profile-modal" class="btn-secondary">✕ Fechar</button>
+  <!-- ===== Modal Perfil Público do Jogador ===== -->
+  <div id="profile-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="profile-modal-title">👤 Perfil do Jogador</h2>
+          <p id="profile-modal-sub" class="subtitle"></p>
+        </div>
+        <button type="button" id="close-profile-modal" class="btn-secondary btn-small">✕ Fechar</button>
       </div>
-      <div id="profile-modal-stats" class="stats"></div>
+      <div id="profile-modal-stats" class="stats" style="margin-bottom: 16px;"></div>
       <div id="profile-modal-games" class="games-grid"></div>
-      <p id="profile-modal-empty" class="empty-msg hidden">Este jogador ainda não cadastrou jogos na biblioteca.</p>
     </div>
   </div>
 
