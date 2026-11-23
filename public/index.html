@@ -12,23 +12,26 @@
 </head>
 <body>
   <header>
-    <h1>🎮 GameVault</h1>
-    <p>Sua biblioteca, conquistas e ranking de jogadores</p>
-    <button id="install-btn" class="btn-install hidden">📲 Instalar App</button>
+    <div id="header-covers-bg" class="header-covers-bg"></div>
+    <div class="header-content">
+      <h1>🎮 GameVault</h1>
+      <p>Sua biblioteca, conquistas e ranking de jogadores</p>
+      <button id="install-btn" class="btn-install hidden">📲 Instalar App</button>
 
-    <!-- Barra do Usuário Logado + Navegação por Abas -->
-    <div id="user-bar" class="user-bar hidden">
-      <div class="user-badge">
-        <span>👤 <strong id="current-username">Jogador</strong></span>
-        <button type="button" id="logout-btn" class="btn-logout">Sair</button>
+      <!-- Barra do Usuário Logado + Navegação por Abas -->
+      <div id="user-bar" class="user-bar hidden">
+        <div class="user-badge">
+          <span>👤 <strong id="current-username">Jogador</strong></span>
+          <button type="button" id="logout-btn" class="btn-logout">Sair</button>
+        </div>
+
+        <nav class="tabs-nav">
+          <button type="button" class="tab-btn active" data-tab="library">🎮 Biblioteca</button>
+          <button type="button" class="tab-btn" data-tab="wishlist">⭐ Desejos</button>
+          <button type="button" class="tab-btn" data-tab="ranking">🏆 Ranking</button>
+          <button type="button" class="tab-btn" data-tab="settings">⚙️ Configurações</button>
+        </nav>
       </div>
-
-      <nav class="tabs-nav">
-        <button type="button" class="tab-btn active" data-tab="library">🎮 Biblioteca</button>
-        <button type="button" class="tab-btn" data-tab="wishlist">⭐ Desejos</button>
-        <button type="button" class="tab-btn" data-tab="ranking">🏆 Ranking</button>
-        <button type="button" class="tab-btn" data-tab="settings">⚙️ Configurações</button>
-      </nav>
     </div>
   </header>
 

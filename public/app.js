@@ -1,5 +1,5 @@
 // ========================================
-// GameVault - Biblioteca, Ranking & Core (Multi-User + 3D Gamer)
+// GameVault - Biblioteca, Ranking & Core (Multi-User)
 // ========================================
 
 let games = [];
@@ -36,6 +36,7 @@ function clearSession() {
   if (typeof wishlist !== 'undefined') wishlist = [];
   localStorage.removeItem('gv_token');
   localStorage.removeItem('gv_user');
+  renderHeaderCovers();
 }
 
 async function apiFetch(url, options = {}) {
@@ -224,27 +225,45 @@ document.getElementById('logout-btn').addEventListener('click', () => {
   showToast('Você saiu da conta.');
 });
 
-// ===== Efeito 3D Interativo no Painel de Login/Cadastro =====
-const authStage = document.getElementById('auth-wrapper');
-const authPanel = document.getElementById('auth-section');
+// ===== Carrossel de Capas no Cabeçalho =====
+function renderHeaderCovers() {
+  const container = document.getElementById('header-covers-bg');
+  if (!container) return;
 
-if (authStage && authPanel) {
-  authStage.addEventListener('mousemove', (e) => {
-    const rect = authPanel.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  const wishArr = typeof wishlist !== 'undefined' && Array.isArray(wishlist) ? wishlist : [];
+  const allItems = [...games, ...wishArr];
 
-    authPanel.style.setProperty('--mouse-x', `${x}px`);
-    authPanel.style.setProperty('--mouse-y', `${y}px`);
+  const uniqueCovers = [];
+  const seen = new Set();
 
-    const rotateY = ((x / rect.width) - 0.5) * 10;
-    const rotateX = ((y / rect.height) - 0.5) * -10;
-    authPanel.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
-  });
+  for (const item of allItems) {
+    const safe = sanitizeUrl(item.cover);
+    if (safe && !seen.has(safe)) {
+      seen.add(safe);
+      uniqueCovers.push({ cover: safe, title: item.title || '' });
+    }
+  }
 
-  authStage.addEventListener('mouseleave', () => {
-    authPanel.style.transform = 'rotateX(0deg) rotateY(0deg)';
-  });
+  if (uniqueCovers.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  // Garante capas suficientes para preencher toda a largura sem buracos
+  let baseList = [...uniqueCovers];
+  while (baseList.length < 12) {
+    baseList = baseList.concat(uniqueCovers);
+  }
+
+  // Duplica a sequência para o loop infinito contínuo (-50%)
+  const loopList = [...baseList, ...baseList];
+  const durationSeconds = Math.max(24, baseList.length * 3.2);
+
+  container.innerHTML = `
+    <div class="header-covers-track" style="--marquee-duration: ${durationSeconds}s;">
+      ${loopList.map(c => `<img class="header-cover-item" src="${escapeHtml(c.cover)}" alt="" loading="lazy" onerror="this.style.display='none'">`).join('')}
+    </div>
+  `;
 }
 
 // ===== Persistência Biblioteca (API + PostgreSQL Neon) =====
@@ -719,6 +738,7 @@ function render() {
   renderStats();
   renderCharts();
   renderGames();
+  renderHeaderCovers();
 }
 
 // ===== Formulário Biblioteca =====
@@ -830,40 +850,6 @@ document.getElementById('search').addEventListener('input', renderGames);
 ['filter-platform', 'filter-status', 'sort-by'].forEach(id => {
   document.getElementById(id).addEventListener('change', renderGames);
 });
-
-// ===== Efeito 3D Tilt nos Cards (Biblioteca + Lista de Desejos) =====
-function bind3DTilt(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-
-  container.addEventListener('mousemove', (e) => {
-    const card = e.target.closest('.game-card');
-    if (!card) return;
-
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    card.style.setProperty('--mouse-x', `${x}px`);
-    card.style.setProperty('--mouse-y', `${y}px`);
-
-    const rotateY = ((x / rect.width) - 0.5) * 14;
-    const rotateX = ((y / rect.height) - 0.5) * -14;
-
-    card.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-4px)`;
-  });
-
-  container.addEventListener('mouseout', (e) => {
-    const card = e.target.closest('.game-card');
-    if (!card) return;
-    if (!card.contains(e.relatedTarget)) {
-      card.style.transform = 'rotateX(0deg) rotateY(0deg) translateY(0)';
-    }
-  });
-}
-
-bind3DTilt('games-list');
-bind3DTilt('wish-list');
 
 // ===== PWA / Service Worker =====
 if ('serviceWorker' in navigator) {

@@ -116,6 +116,7 @@ function renderWishlistStats() {
 
 function renderWishlist() {
   renderWishlistStats();
+  if (typeof renderHeaderCovers === 'function') renderHeaderCovers();
   const listEl = document.getElementById('wish-list');
   const emptyMsg = document.getElementById('wish-empty-msg');
   const countEl = document.getElementById('wish-count');
