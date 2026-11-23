@@ -1,4 +1,4 @@
-const CACHE = 'gamevault-v13';
+const CACHE = 'gamevault-v14';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,8 @@ const ASSETS = [
   './wishlist.js',
   './app.js',
   './manifest.json',
+  './css/social.css',
+  './community.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
 ];
 

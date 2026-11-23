@@ -34,6 +34,7 @@ function clearSession() {
   currentUser = null;
   games = [];
   if (typeof wishlist !== 'undefined') wishlist = [];
+  if (typeof stopChatPolling === 'function') stopChatPolling();
   localStorage.removeItem('gv_token');
   localStorage.removeItem('gv_user');
   renderHeaderCovers();
@@ -249,13 +250,11 @@ function renderHeaderCovers() {
     return;
   }
 
-  // Garante capas suficientes para preencher toda a largura sem buracos
   let baseList = [...uniqueCovers];
   while (baseList.length < 12) {
     baseList = baseList.concat(uniqueCovers);
   }
 
-  // Duplica a sequência para o loop infinito contínuo (-50%)
   const loopList = [...baseList, ...baseList];
   const durationSeconds = Math.max(24, baseList.length * 3.2);
 
@@ -303,13 +302,14 @@ async function loadRanking() {
     podiumEl.innerHTML = top3.map((player, idx) => {
       const isMe = currentUser && player.id === currentUser.id;
       return `
-        <div class="podium-card podium-${idx + 1}">
+        <div class="podium-card podium-${idx + 1} clickable-player" data-user-id="${player.id}">
           <div class="podium-medal">${medals[idx]}</div>
           <div class="podium-name">${escapeHtml(player.username)} ${isMe ? '(Você)' : ''}</div>
           <div class="podium-hours">${Number(player.total_hours).toFixed(1)}h</div>
           <div class="podium-sub">
             🎮 ${player.total_games} jogos • 🏆 ${player.platinums} platinas • ✅ ${player.completed} zerados
           </div>
+          <div class="podium-sub" style="color:#38bdf8; margin-top:8px;">👁️ Ver biblioteca</div>
         </div>
       `;
     }).join('');
@@ -318,7 +318,7 @@ async function loadRanking() {
       const isMe = currentUser && player.id === currentUser.id;
       const posLabel = idx < 3 ? medals[idx] : `#${idx + 1}`;
       return `
-        <div class="rank-row ${isMe ? 'is-me' : ''}">
+        <div class="rank-row ${isMe ? 'is-me' : ''} clickable-player" data-user-id="${player.id}">
           <div class="rank-left">
             <span class="rank-pos">${posLabel}</span>
             <span class="rank-user">${escapeHtml(player.username)} ${isMe ? '<span class="badge status-Jogando">Você</span>' : ''}</span>
@@ -328,6 +328,7 @@ async function loadRanking() {
             <span class="badge rating">🏆 ${player.platinums} 100%</span>
             <span class="badge status-Zerado">✅ ${player.completed} zerados</span>
             <span class="badge">📚 ${player.total_games} jogos</span>
+            <span class="badge" style="color:#38bdf8;">👁️ Ver jogos</span>
           </div>
         </div>
       `;
@@ -343,6 +344,13 @@ async function loadRanking() {
 document.getElementById('refresh-ranking-btn').addEventListener('click', () => {
   loadRanking();
   showToast('Ranking atualizado!');
+});
+
+document.getElementById('tab-ranking').addEventListener('click', (e) => {
+  const playerEl = e.target.closest('[data-user-id]');
+  if (playerEl && typeof openPlayerProfile === 'function') {
+    openPlayerProfile(playerEl.dataset.userId);
+  }
 });
 
 // ===== Helpers Globais =====
@@ -797,6 +805,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (target === 'library') renderCharts();
     if (target === 'wishlist' && typeof renderWishlist === 'function') renderWishlist();
     if (target === 'ranking') loadRanking();
+    if (target === 'posts' && typeof loadCommunityPosts === 'function') loadCommunityPosts();
+
+    if (target === 'chat' && typeof startChatPolling === 'function') {
+      startChatPolling();
+    } else if (typeof stopChatPolling === 'function') {
+      stopChatPolling();
+    }
   });
 });
 

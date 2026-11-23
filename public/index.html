@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GameVault - Biblioteca & Ranking</title>
+  <title>GameVault - Biblioteca & Comunidade</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/library.css">
   <link rel="stylesheet" href="css/community.css">
+  <link rel="stylesheet" href="css/social.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0b0f19">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -18,7 +19,7 @@
     <div id="header-covers-bg" class="header-covers-bg"></div>
     <div class="header-content">
       <h1>🎮 GameVault</h1>
-      <p>Sua biblioteca, conquistas e ranking de jogadores</p>
+      <p>Sua biblioteca, conquistas, ranking e comunidade gamer</p>
       <button id="install-btn" class="btn-install hidden">📲 Instalar App</button>
 
       <!-- Barra do Usuário Logado + Navegação por Abas -->
@@ -32,6 +33,8 @@
           <button type="button" class="tab-btn active" data-tab="library">🎮 Biblioteca</button>
           <button type="button" class="tab-btn" data-tab="wishlist">⭐ Desejos</button>
           <button type="button" class="tab-btn" data-tab="ranking">🏆 Ranking</button>
+          <button type="button" class="tab-btn" data-tab="posts">📢 Mural</button>
+          <button type="button" class="tab-btn" data-tab="chat">💬 Chat</button>
           <button type="button" class="tab-btn" data-tab="settings">⚙️ Configurações</button>
         </nav>
       </div>
@@ -52,7 +55,6 @@
           <h2 id="auth-title">Entrar no GameVault</h2>
           <p id="auth-subtitle" class="settings-desc">Acesse sua biblioteca e dispute o topo do ranking de horas jogadas.</p>
 
-          <!-- Formulário Principal (Login / Cadastro) -->
           <form id="auth-form" class="auth-form">
             <div class="field">
               <label for="auth-username">Nome de Usuário</label>
@@ -75,7 +77,6 @@
             </div>
           </form>
 
-          <!-- Formulário de Recuperação de Senha -->
           <form id="forgot-form" class="auth-form hidden">
             <div class="field">
               <label for="forgot-username">Nome de Usuário</label>
@@ -221,7 +222,7 @@
         </section>
       </div>
 
-      <!-- ABA 2: LISTA DE DESEJOS (WISHLIST) -->
+      <!-- ABA 2: LISTA DE DESEJOS -->
       <div id="tab-wishlist" class="tab-content hidden">
         <section class="form-section" id="wish-form-section">
           <h2 id="wish-form-title">⭐ Adicionar à Lista de Desejos</h2>
@@ -312,7 +313,7 @@
         </section>
       </div>
 
-      <!-- ABA 3: RANKING / COMPETIÇÃO -->
+      <!-- ABA 3: RANKING / PERFIS -->
       <div id="tab-ranking" class="tab-content hidden">
         <section class="ranking-section">
           <div class="ranking-header">
@@ -320,18 +321,70 @@
             <button type="button" id="refresh-ranking-btn" class="btn-secondary">🔄 Atualizar</button>
           </div>
           <p class="settings-desc">
-            Classificação baseada no total de horas jogadas (desempate por platinas 100% e jogos zerados).
+            Clique em qualquer jogador abaixo para visualizar o perfil e os jogos cadastrados por ele.
           </p>
 
-          <!-- Pódio Top 3 -->
           <div id="ranking-podium" class="podium-grid"></div>
-
-          <!-- Lista Geral -->
           <div id="ranking-list" class="ranking-list"></div>
         </section>
       </div>
 
-      <!-- ABA 4: CONFIGURAÇÕES -->
+      <!-- ABA 4: MURAL DE INFORMAÇÕES -->
+      <div id="tab-posts" class="tab-content hidden">
+        <section>
+          <h2>📢 Publicar no Mural da Comunidade</h2>
+          <form id="post-form">
+            <div class="form-grid">
+              <div class="field">
+                <label for="post-title">Título da Publicação *</label>
+                <input type="text" id="post-title" required maxlength="120" placeholder="Ex: Promoção na PSN, Dica de platina...">
+              </div>
+
+              <div class="field">
+                <label for="post-category">Categoria</label>
+                <select id="post-category">
+                  <option value="Geral">📢 Geral</option>
+                  <option value="Dicas & Guias">🎯 Dicas & Guias</option>
+                  <option value="Promoções">💰 Promoções</option>
+                  <option value="Review">⭐ Review / Opinião</option>
+                </select>
+              </div>
+
+              <div class="field full">
+                <label for="post-content">Mensagem *</label>
+                <textarea id="post-content" rows="3" required maxlength="2000" placeholder="Escreva uma informação, novidade ou dica para todos os jogadores..."></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Publicar para Todos</button>
+            </div>
+          </form>
+        </section>
+
+        <section>
+          <h2>📰 Publicações da Comunidade</h2>
+          <div id="posts-list" class="posts-list"></div>
+          <p id="posts-empty-msg" class="empty-msg hidden">Nenhuma publicação ainda. Compartilhe algo com a galera! 📢</p>
+        </section>
+      </div>
+
+      <!-- ABA 5: CHAT DA COMUNIDADE -->
+      <div id="tab-chat" class="tab-content hidden">
+        <section>
+          <h2>💬 Chat Geral dos Jogadores</h2>
+          <p class="settings-desc">Converse com os jogadores online, combine partidas ou troque ideias sobre jogos.</p>
+
+          <div id="chat-messages" class="chat-box"></div>
+
+          <form id="chat-form" class="chat-form">
+            <input type="text" id="chat-input" maxlength="500" required autocomplete="off" placeholder="Digite sua mensagem...">
+            <button type="submit" class="btn-primary">Enviar</button>
+          </form>
+        </section>
+      </div>
+
+      <!-- ABA 6: CONFIGURAÇÕES -->
       <div id="tab-settings" class="tab-content hidden">
         <section class="backup-section">
           <h2>💾 Backup e Restauração</h2>
@@ -354,7 +407,7 @@
             Seus dados estão vinculados à sua conta na nuvem com PostgreSQL (Neon) e capas integradas via IGDB.
           </p>
           <div class="settings-meta">
-            <span class="badge">Versão 3.2 (Biblioteca + Wishlist + Ranking)</span>
+            <span class="badge">Versão 4.0 (Biblioteca + Wishlist + Ranking + Mural + Chat)</span>
             <span class="badge status-Jogando">● Banco Online</span>
           </div>
         </section>
@@ -363,9 +416,23 @@
     </div>
   </main>
 
+  <!-- Modal de Perfil Público de Outro Jogador -->
+  <div id="player-profile-modal" class="profile-modal hidden">
+    <div class="profile-modal-card">
+      <div class="profile-modal-header">
+        <h2 id="profile-modal-title" style="margin:0;">🎮 Perfil do Jogador</h2>
+        <button type="button" id="close-profile-modal" class="btn-secondary">✕ Fechar</button>
+      </div>
+      <div id="profile-modal-stats" class="stats"></div>
+      <div id="profile-modal-games" class="games-grid"></div>
+      <p id="profile-modal-empty" class="empty-msg hidden">Este jogador ainda não cadastrou jogos na biblioteca.</p>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <script src="wishlist.js"></script>
+  <script src="community.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
