@@ -34,8 +34,12 @@ async function initDb() {
     );
   `);
 
+  // Garante compatibilidade com tabelas users criadas em versões anteriores
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS salt TEXT;`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS prefix_hash TEXT;`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS prefix_salt TEXT;`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at BIGINT;`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS games (
@@ -68,7 +72,7 @@ async function initDb() {
     );
   `);
 
-  // ===== Novas Tabelas Sociais (Mural, Comentários & Chat) =====
+  // ===== Tabelas Sociais (Mural, Comentários & Chat) =====
   await pool.query(`
     CREATE TABLE IF NOT EXISTS community_posts (
       id TEXT PRIMARY KEY,
@@ -110,8 +114,15 @@ function hashSecret(value, salt = crypto.randomBytes(16).toString('hex')) {
 
 function verifySecret(value, salt, expectedHash) {
   if (!salt || !expectedHash) return false;
-  const { hash } = hashSecret(value, salt);
-  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(expectedHash, 'hex'));
+  try {
+    const { hash } = hashSecret(value, salt);
+    const a = Buffer.from(hash, 'hex');
+    const b = Buffer.from(expectedHash, 'hex');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 function createToken(user) {
@@ -220,18 +231,41 @@ app.post('/api/auth/login', async (req, res) => {
     const password = String(req.body.password || '');
 
     const result = await pool.query(
-      'SELECT id, username, password_hash, salt, prefix_hash FROM users WHERE LOWER(username) = LOWER($1)',
+      'SELECT * FROM users WHERE LOWER(username) = LOWER($1)',
       [username]
     );
     const user = result.rows[0];
-
-    if (!user || !verifySecret(password, user.salt, user.password_hash)) {
+    if (!user) {
       return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
     }
 
-    if (!user.prefix_hash && password.length >= 3) {
+    const storedHash = user.password_hash || user.password || '';
+    let isValid = false;
+    let needsUpgrade = false;
+
+    if (user.salt && storedHash) {
+      isValid = verifySecret(password, user.salt, storedHash);
+    } else if (storedHash.includes(':')) {
+      const [legacySalt, legacyHash] = storedHash.split(':');
+      isValid = verifySecret(password, legacySalt, legacyHash);
+      needsUpgrade = isValid;
+    } else if (storedHash) {
+      const sha256 = crypto.createHash('sha256').update(password).digest('hex');
+      isValid = storedHash === sha256 || storedHash === password;
+      needsUpgrade = isValid;
+    }
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    }
+
+    if (needsUpgrade || (!user.prefix_hash && password.length >= 3)) {
+      const { salt, hash } = hashSecret(password);
       const { salt: prefixSalt, hash: prefixHash } = hashSecret(password.slice(0, 3));
-      await pool.query('UPDATE users SET prefix_hash = $1, prefix_salt = $2 WHERE id = $3', [prefixHash, prefixSalt, user.id]);
+      await pool.query(
+        'UPDATE users SET password_hash = $1, salt = $2, prefix_hash = $3, prefix_salt = $4 WHERE id = $5',
+        [hash, salt, prefixHash, prefixSalt, user.id]
+      );
     }
 
     const token = createToken({ id: user.id, username: user.username });
@@ -299,7 +333,7 @@ app.get('/api/ranking', authMiddleware, async (req, res) => {
         COUNT(CASE WHEN g.status = '100%' THEN 1 END)::int AS platinums,
         COUNT(CASE WHEN g.status IN ('Zerado', '100%') THEN 1 END)::int AS completed
       FROM users u
-      LEFT JOIN games g ON g.user_id = u.id
+      LEFT JOIN games g ON g.user_id::text = u.id::text
       GROUP BY u.id, u.username
       ORDER BY total_hours DESC, platinums DESC, completed DESC, total_games DESC, u.username ASC
     `);
@@ -315,12 +349,12 @@ app.get('/api/users/:id/profile', authMiddleware, async (req, res) => {
     const userId = String(req.params.id || '').trim();
     if (!userId) return res.status(400).json({ error: 'ID inválido' });
 
-    const userRes = await pool.query('SELECT id, username, created_at FROM users WHERE id = $1', [userId]);
+    const userRes = await pool.query('SELECT id, username, created_at FROM users WHERE id::text = $1', [userId]);
     const user = userRes.rows[0];
     if (!user) return res.status(404).json({ error: 'Jogador não encontrado.' });
 
     const gamesRes = await pool.query(
-      'SELECT * FROM games WHERE user_id = $1 ORDER BY hours DESC, rating DESC NULLS LAST, added_at DESC',
+      'SELECT * FROM games WHERE user_id::text = $1 ORDER BY hours DESC, rating DESC NULLS LAST, added_at DESC',
       [userId]
     );
     const playerGames = gamesRes.rows.map(mapGameRow);
@@ -334,7 +368,7 @@ app.get('/api/users/:id/profile', authMiddleware, async (req, res) => {
     };
 
     res.json({
-      user: { id: user.id, username: user.username, createdAt: Number(user.created_at) },
+      user: { id: user.id, username: user.username, createdAt: Number(user.created_at || 0) },
       stats,
       games: playerGames
     });
@@ -350,7 +384,7 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
     const postsRes = await pool.query(`
       SELECT p.id, p.user_id, u.username, p.title, p.content, p.category, p.created_at
       FROM community_posts p
-      JOIN users u ON u.id = p.user_id
+      JOIN users u ON u.id::text = p.user_id::text
       ORDER BY p.created_at DESC
       LIMIT 60
     `);
@@ -358,7 +392,7 @@ app.get('/api/posts', authMiddleware, async (req, res) => {
     const commentsRes = await pool.query(`
       SELECT c.id, c.post_id, c.user_id, u.username, c.content, c.created_at
       FROM post_comments c
-      JOIN users u ON u.id = c.user_id
+      JOIN users u ON u.id::text = c.user_id::text
       ORDER BY c.created_at ASC
     `);
 
@@ -408,7 +442,7 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
     await pool.query(
       `INSERT INTO community_posts (id, user_id, title, content, category, created_at)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, req.user.id, title.slice(0, 120), content.slice(0, 2000), category, createdAt]
+      [id, String(req.user.id), title.slice(0, 120), content.slice(0, 2000), category, createdAt]
     );
 
     res.status(201).json({
@@ -430,8 +464,8 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
 app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      'DELETE FROM community_posts WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.id]
+      'DELETE FROM community_posts WHERE id = $1 AND user_id::text = $2',
+      [req.params.id, String(req.user.id)]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Publicação não encontrada.' });
     res.json({ deleted: true });
@@ -451,7 +485,7 @@ app.post('/api/posts/:id/comments', authMiddleware, async (req, res) => {
     await pool.query(
       `INSERT INTO post_comments (id, post_id, user_id, content, created_at)
        VALUES ($1, $2, $3, $4, $5)`,
-      [id, req.params.id, req.user.id, content.slice(0, 600), createdAt]
+      [id, req.params.id, String(req.user.id), content.slice(0, 600), createdAt]
     );
 
     res.status(201).json({
@@ -471,8 +505,8 @@ app.post('/api/posts/:id/comments', authMiddleware, async (req, res) => {
 app.delete('/api/comments/:id', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      'DELETE FROM post_comments WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.id]
+      'DELETE FROM post_comments WHERE id = $1 AND user_id::text = $2',
+      [req.params.id, String(req.user.id)]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Comentário não encontrado.' });
     res.json({ deleted: true });
@@ -489,7 +523,7 @@ app.get('/api/chat', authMiddleware, async (req, res) => {
       SELECT * FROM (
         SELECT m.id, m.user_id, u.username, m.message, m.created_at
         FROM chat_messages m
-        JOIN users u ON u.id = m.user_id
+        JOIN users u ON u.id::text = m.user_id::text
         ORDER BY m.created_at DESC
         LIMIT 80
       ) sub
@@ -518,7 +552,7 @@ app.post('/api/chat', authMiddleware, async (req, res) => {
     const createdAt = Date.now();
     await pool.query(
       'INSERT INTO chat_messages (id, user_id, message, created_at) VALUES ($1, $2, $3, $4)',
-      [id, req.user.id, message.slice(0, 500), createdAt]
+      [id, String(req.user.id), message.slice(0, 500), createdAt]
     );
 
     res.status(201).json({
@@ -537,8 +571,8 @@ app.post('/api/chat', authMiddleware, async (req, res) => {
 app.delete('/api/chat/:id', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      'DELETE FROM chat_messages WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.id]
+      'DELETE FROM chat_messages WHERE id = $1 AND user_id::text = $2',
+      [req.params.id, String(req.user.id)]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Mensagem não encontrada.' });
     res.json({ deleted: true });
@@ -552,8 +586,8 @@ app.delete('/api/chat/:id', authMiddleware, async (req, res) => {
 app.get('/api/games', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM games WHERE user_id = $1 ORDER BY added_at DESC',
-      [req.user.id]
+      'SELECT * FROM games WHERE user_id::text = $1 ORDER BY added_at DESC',
+      [String(req.user.id)]
     );
     res.json(result.rows.map(mapGameRow));
   } catch (err) {
@@ -575,7 +609,7 @@ app.post('/api/games', authMiddleware, async (req, res) => {
       `INSERT INTO games (id, user_id, title, platform, genre, status, rating, hours, cover, notes, added_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [id, req.user.id, g.title, g.platform, g.genre || '', g.status, g.rating ?? null, g.hours ?? 0, g.cover || '', g.notes || '', addedAt]
+      [id, String(req.user.id), g.title, g.platform, g.genre || '', g.status, g.rating ?? null, g.hours ?? 0, g.cover || '', g.notes || '', addedAt]
     );
     res.status(201).json(mapGameRow(result.rows[0]));
   } catch (err) {
@@ -592,8 +626,8 @@ app.post('/api/games/bulk', authMiddleware, async (req, res) => {
   try {
     await client.query('BEGIN');
     const existingRes = await client.query(
-      'SELECT LOWER(title) AS t, platform FROM games WHERE user_id = $1',
-      [req.user.id]
+      'SELECT LOWER(title) AS t, platform FROM games WHERE user_id::text = $1',
+      [String(req.user.id)]
     );
     const existingKeys = new Set(existingRes.rows.map(r => `${r.t}|${r.platform}`));
 
@@ -607,7 +641,7 @@ app.post('/api/games/bulk', authMiddleware, async (req, res) => {
       await client.query(
         `INSERT INTO games (id, user_id, title, platform, genre, status, rating, hours, cover, notes, added_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [id, req.user.id, g.title, g.platform, g.genre || '', g.status || 'Não iniciado', g.rating ?? null, g.hours ?? 0, g.cover || '', g.notes || '', g.addedAt || Date.now()]
+        [id, String(req.user.id), g.title, g.platform, g.genre || '', g.status || 'Não iniciado', g.rating ?? null, g.hours ?? 0, g.cover || '', g.notes || '', g.addedAt || Date.now()]
       );
       existingKeys.add(key);
       importedCount++;
@@ -629,9 +663,9 @@ app.put('/api/games/:id', authMiddleware, async (req, res) => {
     const result = await pool.query(
       `UPDATE games
        SET title = $1, platform = $2, genre = $3, status = $4, rating = $5, hours = $6, cover = $7, notes = $8
-       WHERE id = $9 AND user_id = $10
+       WHERE id = $9 AND user_id::text = $10
        RETURNING *`,
-      [g.title, g.platform, g.genre || '', g.status, g.rating ?? null, g.hours ?? 0, g.cover || '', g.notes || '', req.params.id, req.user.id]
+      [g.title, g.platform, g.genre || '', g.status, g.rating ?? null, g.hours ?? 0, g.cover || '', g.notes || '', req.params.id, String(req.user.id)]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Jogo não encontrado.' });
     res.json(mapGameRow(result.rows[0]));
@@ -644,8 +678,8 @@ app.put('/api/games/:id', authMiddleware, async (req, res) => {
 app.delete('/api/games/:id', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      'DELETE FROM games WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.id]
+      'DELETE FROM games WHERE id = $1 AND user_id::text = $2',
+      [req.params.id, String(req.user.id)]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Jogo não encontrado.' });
     res.json({ deleted: true });
@@ -659,8 +693,8 @@ app.delete('/api/games/:id', authMiddleware, async (req, res) => {
 app.get('/api/wishlist', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM wishlist WHERE user_id = $1 ORDER BY added_at DESC',
-      [req.user.id]
+      'SELECT * FROM wishlist WHERE user_id::text = $1 ORDER BY added_at DESC',
+      [String(req.user.id)]
     );
     res.json(result.rows.map(mapWishRow));
   } catch (err) {
@@ -682,7 +716,7 @@ app.post('/api/wishlist', authMiddleware, async (req, res) => {
       `INSERT INTO wishlist (id, user_id, title, platform, genre, priority, target_price, cover, notes, added_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [id, req.user.id, w.title, w.platform, w.genre || '', w.priority || 'Média', w.targetPrice ?? null, w.cover || '', w.notes || '', addedAt]
+      [id, String(req.user.id), w.title, w.platform, w.genre || '', w.priority || 'Média', w.targetPrice ?? null, w.cover || '', w.notes || '', addedAt]
     );
     res.status(201).json(mapWishRow(result.rows[0]));
   } catch (err) {
@@ -697,9 +731,9 @@ app.put('/api/wishlist/:id', authMiddleware, async (req, res) => {
     const result = await pool.query(
       `UPDATE wishlist
        SET title = $1, platform = $2, genre = $3, priority = $4, target_price = $5, cover = $6, notes = $7
-       WHERE id = $8 AND user_id = $9
+       WHERE id = $8 AND user_id::text = $9
        RETURNING *`,
-      [w.title, w.platform, w.genre || '', w.priority || 'Média', w.targetPrice ?? null, w.cover || '', w.notes || '', req.params.id, req.user.id]
+      [w.title, w.platform, w.genre || '', w.priority || 'Média', w.targetPrice ?? null, w.cover || '', w.notes || '', req.params.id, String(req.user.id)]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Item não encontrado.' });
     res.json(mapWishRow(result.rows[0]));
@@ -712,8 +746,8 @@ app.put('/api/wishlist/:id', authMiddleware, async (req, res) => {
 app.delete('/api/wishlist/:id', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      'DELETE FROM wishlist WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.id]
+      'DELETE FROM wishlist WHERE id = $1 AND user_id::text = $2',
+      [req.params.id, String(req.user.id)]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Item não encontrado.' });
     res.json({ deleted: true });
@@ -728,8 +762,8 @@ app.post('/api/wishlist/:id/move-to-library', authMiddleware, async (req, res) =
   try {
     await client.query('BEGIN');
     const wishRes = await client.query(
-      'SELECT * FROM wishlist WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.id]
+      'SELECT * FROM wishlist WHERE id = $1 AND user_id::text = $2',
+      [req.params.id, String(req.user.id)]
     );
     if (wishRes.rowCount === 0) {
       await client.query('ROLLBACK');
@@ -744,10 +778,10 @@ app.post('/api/wishlist/:id/move-to-library', authMiddleware, async (req, res) =
       `INSERT INTO games (id, user_id, title, platform, genre, status, rating, hours, cover, notes, added_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [newGameId, req.user.id, w.title, w.platform, w.genre || '', 'Não iniciado', null, 0, w.cover || '', w.notes || '', now]
+      [newGameId, String(req.user.id), w.title, w.platform, w.genre || '', 'Não iniciado', null, 0, w.cover || '', w.notes || '', now]
     );
 
-    await client.query('DELETE FROM wishlist WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    await client.query('DELETE FROM wishlist WHERE id = $1 AND user_id::text = $2', [req.params.id, String(req.user.id)]);
     await client.query('COMMIT');
 
     res.json({ game: mapGameRow(gameRes.rows[0]) });

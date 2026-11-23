@@ -300,9 +300,9 @@ async function loadRanking() {
     const top3 = ranking.slice(0, 3);
 
     podiumEl.innerHTML = top3.map((player, idx) => {
-      const isMe = currentUser && player.id === currentUser.id;
+      const isMe = currentUser && String(player.id) === String(currentUser.id);
       return `
-        <div class="podium-card podium-${idx + 1} clickable-player" data-user-id="${player.id}">
+        <div class="podium-card podium-${idx + 1} clickable-player" data-user-id="${escapeHtml(String(player.id))}">
           <div class="podium-medal">${medals[idx]}</div>
           <div class="podium-name">${escapeHtml(player.username)} ${isMe ? '(Você)' : ''}</div>
           <div class="podium-hours">${Number(player.total_hours).toFixed(1)}h</div>
@@ -315,10 +315,10 @@ async function loadRanking() {
     }).join('');
 
     listEl.innerHTML = ranking.map((player, idx) => {
-      const isMe = currentUser && player.id === currentUser.id;
+      const isMe = currentUser && String(player.id) === String(currentUser.id);
       const posLabel = idx < 3 ? medals[idx] : `#${idx + 1}`;
       return `
-        <div class="rank-row ${isMe ? 'is-me' : ''} clickable-player" data-user-id="${player.id}">
+        <div class="rank-row ${isMe ? 'is-me' : ''} clickable-player" data-user-id="${escapeHtml(String(player.id))}">
           <div class="rank-left">
             <span class="rank-pos">${posLabel}</span>
             <span class="rank-user">${escapeHtml(player.username)} ${isMe ? '<span class="badge status-Jogando">Você</span>' : ''}</span>
