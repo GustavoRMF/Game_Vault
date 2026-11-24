@@ -32,7 +32,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS games (
       id TEXT PRIMARY KEY,
-      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
       title TEXT NOT NULL,
       platform TEXT NOT NULL,
       genre TEXT DEFAULT '',
@@ -48,7 +48,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS wishlist (
       id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
       title TEXT NOT NULL,
       platform TEXT NOT NULL,
       genre TEXT DEFAULT '',
@@ -63,7 +63,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS community_posts (
       id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       category VARCHAR(40) DEFAULT 'Geral',
@@ -78,7 +78,7 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS post_comments (
       id TEXT PRIMARY KEY,
       post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
       content TEXT NOT NULL,
       created_at BIGINT NOT NULL
     );
@@ -96,7 +96,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS chat_messages (
       id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
       message TEXT NOT NULL,
       created_at BIGINT NOT NULL
     );

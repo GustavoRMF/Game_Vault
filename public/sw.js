@@ -1,4 +1,4 @@
-const CACHE = 'gamevault-v22';
+const CACHE = 'gamevault-v23';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,8 @@ const ASSETS = [
   './css/library.css',
   './css/community.css',
   './css/social.css',
+  './css/gamer-ui.css',
+  './js/gamer-effects.js',
   './wishlist.js',
   './community.js',
   './app.js',
