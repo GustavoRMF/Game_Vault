@@ -98,4 +98,57 @@
     pingPresence();
     setInterval(pingPresence, 25000);
   });
+  // ===== 4. Cálculo de Nível, Patente e Barra de XP =====
+  window.calculatePlayerXP = function ({ totalGames = 0, totalHours = 0, completed = 0, platinums = 0 }) {
+    const xp = Math.round(
+      (Number(totalHours) * 10) +
+      (Number(completed) * 250) +
+      (Number(platinums) * 600) +
+      (Number(totalGames) * 50)
+    );
+    const level = Math.max(1, Math.floor(xp / 1000) + 1);
+    const currentLevelXp = xp % 1000;
+    const progressPct = Math.min(100, Math.round((currentLevelXp / 1000) * 100));
+
+    let title = 'Novato';
+    let icon = '🕹️';
+    if (level >= 40)      { title = 'Lenda do GameVault'; icon = '👑'; }
+    else if (level >= 25) { title = 'Mestre Gamer';       icon = '🔥'; }
+    else if (level >= 15) { title = 'Veterano';           icon = '⚔️'; }
+    else if (level >= 8)  { title = 'Caçador de Troféus'; icon = '🏆'; }
+    else if (level >= 3)  { title = 'Explorador';         icon = '🧭'; }
+
+    return { xp, level, currentLevelXp, progressPct, title, icon };
+  };
+
+  window.renderHeaderXpWidget = function (gamesList) {
+    const headerTop = document.querySelector('.header-top > div');
+    if (!headerTop || !Array.isArray(gamesList)) return;
+
+    const stats = {
+      totalGames: gamesList.length,
+      totalHours: gamesList.reduce((acc, g) => acc + (Number(g.hours) || 0), 0),
+      completed: gamesList.filter(g => g.status === 'Zerado' || g.status === '100%').length,
+      platinums: gamesList.filter(g => g.status === '100%').length
+    };
+    const info = window.calculatePlayerXP(stats);
+
+    let box = document.getElementById('headerXpWidget');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'headerXpWidget';
+      box.className = 'xp-widget';
+      headerTop.appendChild(box);
+    }
+
+    box.innerHTML = `
+      <div class="xp-widget-top">
+        <span class="xp-rank-badge">${info.icon} Nível ${info.level} • ${info.title}</span>
+        <span style="color:var(--muted);">${info.currentLevelXp} / 1.000 XP (${info.xp.toLocaleString('pt-BR')} XP total)</span>
+      </div>
+      <div class="xp-bar-track">
+        <div class="xp-bar-fill" style="width:${info.progressPct}%"></div>
+      </div>
+    `;
+  };
 })();

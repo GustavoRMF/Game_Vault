@@ -84,7 +84,28 @@ async function openPlayerProfile(userId) {
       <div class="stat-card"><div class="value">${data.stats.completed}</div><div class="label">Zerados</div></div>
       <div class="stat-card"><div class="value">${data.stats.playing}</div><div class="label">Jogando</div></div>
     `;
+    
+const xpInfo = typeof calculatePlayerXP === 'function' ? calculatePlayerXP(data.stats) : null;
+    if (xpInfo) {
+      subEl.innerHTML += ` • <strong>${xpInfo.icon} Nível ${xpInfo.level} (${xpInfo.title})</strong>`;
+    }
 
+    const platinumGames = data.games.filter(g => g.status === '100%');
+    const existingShowcase = document.getElementById('profile-platinum-showcase');
+    if (existingShowcase) existingShowcase.remove();
+
+    if (platinumGames.length > 0) {
+      const showcase = document.createElement('div');
+      showcase.id = 'profile-platinum-showcase';
+      showcase.className = 'platinum-showcase';
+      showcase.innerHTML = `
+        <h3>🏆 Vitrine de Platinas (${platinumGames.length})</h3>
+        <div class="platinum-chips">
+          ${platinumGames.map(p => `<span class="platinum-chip">💎 ${escapeHtml(p.title)}</span>`).join('')}
+        </div>
+      `;
+      gamesEl.parentNode.insertBefore(showcase, gamesEl);
+    }
     if (!data.games.length) {
       gamesEl.innerHTML = '<p class="empty-msg">Este jogador ainda não cadastrou nenhum jogo.</p>';
       return;

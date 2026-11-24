@@ -53,7 +53,12 @@ router.get('/ranking', authMiddleware, async (req, res) => {
         COUNT(g.id)::int AS total_games,
         COALESCE(SUM(g.hours), 0)::float AS total_hours,
         COUNT(CASE WHEN g.status = '100%' THEN 1 END)::int AS platinums,
-        COUNT(CASE WHEN g.status IN ('Zerado', '100%') THEN 1 END)::int AS completed
+        COUNT(CASE WHEN g.status IN ('Zerado', '100%') THEN 1 END)::int AS completed,
+        (
+          SELECT title FROM games
+          WHERE user_id::text = u.id::text AND status = 'Jogando'
+          ORDER BY added_at DESC LIMIT 1
+        ) AS current_game
       FROM users u
       LEFT JOIN games g ON g.user_id::text = u.id::text
       GROUP BY u.id, u.username, u.last_seen

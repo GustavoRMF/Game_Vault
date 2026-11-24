@@ -37,6 +37,8 @@ function clearSession() {
   if (typeof stopChatPolling === 'function') stopChatPolling();
   localStorage.removeItem('gv_token');
   localStorage.removeItem('gv_user');
+  const xpBox = document.getElementById('headerXpWidget');
+  if (xpBox) xpBox.remove();
   renderHeaderCovers();
 }
 
@@ -279,7 +281,7 @@ async function loadGames() {
   }
 }
 
-// ===== Ranking & Competição =====
+// ===== Ranking & Competição (com Nível, Status Online & Jogando Agora) =====
 async function loadRanking() {
   const podiumEl = document.getElementById('ranking-podium');
   const listEl = document.getElementById('ranking-list');
@@ -298,17 +300,29 @@ async function loadRanking() {
 
     const medals = ['🥇', '🥈', '🥉'];
     const top3 = ranking.slice(0, 3);
+    const dotFn = typeof renderOnlineDot === 'function' ? renderOnlineDot : () => '';
 
     podiumEl.innerHTML = top3.map((player, idx) => {
       const isMe = currentUser && String(player.id) === String(currentUser.id);
+      const xp = typeof calculatePlayerXP === 'function'
+        ? calculatePlayerXP({
+            totalGames: player.total_games,
+            totalHours: player.total_hours,
+            completed: player.completed,
+            platinums: player.platinums
+          })
+        : null;
+
       return `
         <div class="podium-card podium-${idx + 1} clickable-player" data-user-id="${escapeHtml(String(player.id))}">
           <div class="podium-medal">${medals[idx]}</div>
-          <div class="podium-name">${escapeHtml(player.username)} ${isMe ? '(Você)' : ''}</div>
+          <div class="podium-name">${dotFn(player.online)}${escapeHtml(player.username)} ${isMe ? '(Você)' : ''}</div>
+          ${xp ? `<div style="margin:4px 0;"><span class="xp-rank-badge">${xp.icon} Nível ${xp.level} • ${xp.title}</span></div>` : ''}
           <div class="podium-hours">${Number(player.total_hours).toFixed(1)}h</div>
           <div class="podium-sub">
             🎮 ${player.total_games} jogos • 🏆 ${player.platinums} platinas • ✅ ${player.completed} zerados
           </div>
+          ${player.current_game ? `<div class="podium-sub" style="color:#4ade80; margin-top:6px;">🕹️ Jogando: <strong>${escapeHtml(player.current_game)}</strong></div>` : ''}
           <div class="podium-sub" style="color:#38bdf8; margin-top:8px;">👁️ Ver biblioteca</div>
         </div>
       `;
@@ -317,11 +331,22 @@ async function loadRanking() {
     listEl.innerHTML = ranking.map((player, idx) => {
       const isMe = currentUser && String(player.id) === String(currentUser.id);
       const posLabel = idx < 3 ? medals[idx] : `#${idx + 1}`;
+      const xp = typeof calculatePlayerXP === 'function'
+        ? calculatePlayerXP({
+            totalGames: player.total_games,
+            totalHours: player.total_hours,
+            completed: player.completed,
+            platinums: player.platinums
+          })
+        : null;
+
       return `
         <div class="rank-row ${isMe ? 'is-me' : ''} clickable-player" data-user-id="${escapeHtml(String(player.id))}">
-          <div class="rank-left">
+          <div class="rank-left" style="flex-wrap:wrap;">
             <span class="rank-pos">${posLabel}</span>
-            <span class="rank-user">${escapeHtml(player.username)} ${isMe ? '<span class="badge status-Jogando">Você</span>' : ''}</span>
+            <span class="rank-user">${dotFn(player.online)}${escapeHtml(player.username)} ${isMe ? '<span class="badge status-Jogando">Você</span>' : ''}</span>
+            ${xp ? `<span class="xp-rank-badge">${xp.icon} Nv. ${xp.level}</span>` : ''}
+            ${player.current_game ? `<span class="badge status-Jogando">🕹️ ${escapeHtml(player.current_game)}</span>` : ''}
           </div>
           <div class="rank-stats">
             <span class="badge">⏱ ${Number(player.total_hours).toFixed(1)}h</span>
@@ -340,7 +365,6 @@ async function loadRanking() {
     }
   }
 }
-
 document.getElementById('refresh-ranking-btn').addEventListener('click', () => {
   loadRanking();
   showToast('Ranking atualizado!');
@@ -751,6 +775,7 @@ function render() {
   renderCharts();
   renderGames();
   renderHeaderCovers();
+  if (typeof renderHeaderXpWidget === 'function') renderHeaderXpWidget(games);
 }
 
 // ===== Formulário Biblioteca =====
