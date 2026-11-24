@@ -17,7 +17,8 @@ async function initDb() {
       salt TEXT NOT NULL,
       prefix_hash TEXT,
       prefix_salt TEXT,
-      created_at BIGINT NOT NULL
+      created_at BIGINT NOT NULL,
+      last_seen BIGINT DEFAULT 0
     );
   `);
 
@@ -26,6 +27,7 @@ async function initDb() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS prefix_hash TEXT;`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS prefix_salt TEXT;`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at BIGINT;`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen BIGINT DEFAULT 0;`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS games (
@@ -65,9 +67,12 @@ async function initDb() {
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       category VARCHAR(40) DEFAULT 'Geral',
+      color VARCHAR(20) DEFAULT 'blue',
       created_at BIGINT NOT NULL
     );
   `);
+
+  await pool.query(`ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT 'blue';`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS post_comments (
@@ -76,6 +81,15 @@ async function initDb() {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       content TEXT NOT NULL,
       created_at BIGINT NOT NULL
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS post_reactions (
+      post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      emoji VARCHAR(16) NOT NULL,
+      PRIMARY KEY (post_id, user_id, emoji)
     );
   `);
 

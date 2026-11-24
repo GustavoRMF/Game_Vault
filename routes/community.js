@@ -3,6 +3,11 @@ const { pool } = require('../db');
 const { authMiddleware, genId } = require('../middleware/auth');
 
 const router = express.Router();
+const ONLINE_WINDOW_MS = 95 * 1000; // 95 segundos
+
+function isUserOnline(lastSeen) {
+  return Date.now() - Number(lastSeen || 0) <= ONLINE_WINDOW_MS;
+}
 
 function mapGameRow(row) {
   return {
@@ -19,6 +24,24 @@ function mapGameRow(row) {
   };
 }
 
+// ===== Heartbeat de Status Online =====
+router.post('/presence/ping', authMiddleware, async (req, res) => {
+  try {
+    const now = Date.now();
+    await pool.query('UPDATE users SET last_seen = $1 WHERE id::text = $2', [now, String(req.user.id)]);
+    const onlineRes = await pool.query(
+      'SELECT id, username FROM users WHERE last_seen >= $1 ORDER BY username ASC',
+      [now - ONLINE_WINDOW_MS]
+    );
+    res.json({
+      onlineCount: onlineRes.rowCount,
+      onlineUsers: onlineRes.rows
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao atualizar presença.' });
+  }
+});
+
 // ===== Ranking & Perfil Público =====
 router.get('/ranking', authMiddleware, async (req, res) => {
   try {
@@ -26,16 +49,20 @@ router.get('/ranking', authMiddleware, async (req, res) => {
       SELECT 
         u.id,
         u.username,
+        u.last_seen,
         COUNT(g.id)::int AS total_games,
         COALESCE(SUM(g.hours), 0)::float AS total_hours,
         COUNT(CASE WHEN g.status = '100%' THEN 1 END)::int AS platinums,
         COUNT(CASE WHEN g.status IN ('Zerado', '100%') THEN 1 END)::int AS completed
       FROM users u
       LEFT JOIN games g ON g.user_id::text = u.id::text
-      GROUP BY u.id, u.username
+      GROUP BY u.id, u.username, u.last_seen
       ORDER BY total_hours DESC, platinums DESC, completed DESC, total_games DESC, u.username ASC
     `);
-    res.json(result.rows);
+    res.json(result.rows.map(r => ({
+      ...r,
+      online: isUserOnline(r.last_seen)
+    })));
   } catch (err) {
     console.error('Erro ao carregar ranking:', err);
     res.status(500).json({ error: 'Erro ao carregar ranking.' });
@@ -47,7 +74,10 @@ router.get('/users/:id/profile', authMiddleware, async (req, res) => {
     const userId = String(req.params.id || '').trim();
     if (!userId) return res.status(400).json({ error: 'ID inválido' });
 
-    const userRes = await pool.query('SELECT id, username, created_at FROM users WHERE id::text = $1', [userId]);
+    const userRes = await pool.query(
+      'SELECT id, username, created_at, last_seen FROM users WHERE id::text = $1',
+      [userId]
+    );
     const user = userRes.rows[0];
     if (!user) return res.status(404).json({ error: 'Jogador não encontrado.' });
 
@@ -66,7 +96,12 @@ router.get('/users/:id/profile', authMiddleware, async (req, res) => {
     };
 
     res.json({
-      user: { id: user.id, username: user.username, createdAt: Number(user.created_at || 0) },
+      user: {
+        id: user.id,
+        username: user.username,
+        createdAt: Number(user.created_at || 0),
+        online: isUserOnline(user.last_seen)
+      },
       stats,
       games: playerGames
     });
@@ -76,23 +111,25 @@ router.get('/users/:id/profile', authMiddleware, async (req, res) => {
   }
 });
 
-// ===== Mural & Comentários =====
+// ===== Mural, Cores, Reações & Comentários =====
 router.get('/posts', authMiddleware, async (req, res) => {
   try {
-    const postsRes = await pool.query(`
-      SELECT p.id, p.user_id, u.username, p.title, p.content, p.category, p.created_at
-      FROM community_posts p
-      JOIN users u ON u.id::text = p.user_id::text
-      ORDER BY p.created_at DESC
-      LIMIT 60
-    `);
-
-    const commentsRes = await pool.query(`
-      SELECT c.id, c.post_id, c.user_id, u.username, c.content, c.created_at
-      FROM post_comments c
-      JOIN users u ON u.id::text = c.user_id::text
-      ORDER BY c.created_at ASC
-    `);
+    const [postsRes, commentsRes, reactionsRes] = await Promise.all([
+      pool.query(`
+        SELECT p.id, p.user_id, u.username, u.last_seen, p.title, p.content, p.category, p.color, p.created_at
+        FROM community_posts p
+        JOIN users u ON u.id::text = p.user_id::text
+        ORDER BY p.created_at DESC
+        LIMIT 60
+      `),
+      pool.query(`
+        SELECT c.id, c.post_id, c.user_id, u.username, u.last_seen, c.content, c.created_at
+        FROM post_comments c
+        JOIN users u ON u.id::text = c.user_id::text
+        ORDER BY c.created_at ASC
+      `),
+      pool.query(`SELECT post_id, user_id, emoji FROM post_reactions`)
+    ]);
 
     const commentsByPost = {};
     for (const c of commentsRes.rows) {
@@ -102,19 +139,36 @@ router.get('/posts', authMiddleware, async (req, res) => {
         postId: c.post_id,
         userId: c.user_id,
         username: c.username,
+        online: isUserOnline(c.last_seen),
         content: c.content,
         createdAt: Number(c.created_at)
       });
+    }
+
+    const reactionsByPost = {};
+    const myId = String(req.user.id);
+    for (const r of reactionsRes.rows) {
+      if (!reactionsByPost[r.post_id]) reactionsByPost[r.post_id] = {};
+      if (!reactionsByPost[r.post_id][r.emoji]) {
+        reactionsByPost[r.post_id][r.emoji] = { count: 0, reacted: false };
+      }
+      reactionsByPost[r.post_id][r.emoji].count++;
+      if (String(r.user_id) === myId) {
+        reactionsByPost[r.post_id][r.emoji].reacted = true;
+      }
     }
 
     const posts = postsRes.rows.map(p => ({
       id: p.id,
       userId: p.user_id,
       username: p.username,
+      online: isUserOnline(p.last_seen),
       title: p.title,
       content: p.content,
       category: p.category || 'Geral',
+      color: p.color || 'blue',
       createdAt: Number(p.created_at),
+      reactions: reactionsByPost[p.id] || {},
       comments: commentsByPost[p.id] || []
     }));
 
@@ -130,6 +184,8 @@ router.post('/posts', authMiddleware, async (req, res) => {
     const title = String(req.body.title || '').trim();
     const content = String(req.body.content || '').trim();
     const category = String(req.body.category || 'Geral').trim().slice(0, 40);
+    const allowedColors = ['blue', 'purple', 'emerald', 'gold', 'crimson', 'cyan'];
+    const color = allowedColors.includes(req.body.color) ? req.body.color : 'blue';
 
     if (!title || !content) {
       return res.status(400).json({ error: 'Preencha o título e a mensagem da publicação.' });
@@ -138,24 +194,60 @@ router.post('/posts', authMiddleware, async (req, res) => {
     const id = genId();
     const createdAt = Date.now();
     await pool.query(
-      `INSERT INTO community_posts (id, user_id, title, content, category, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, String(req.user.id), title.slice(0, 120), content.slice(0, 2000), category, createdAt]
+      `INSERT INTO community_posts (id, user_id, title, content, category, color, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, String(req.user.id), title.slice(0, 120), content.slice(0, 2000), category, color, createdAt]
     );
 
     res.status(201).json({
       id,
       userId: req.user.id,
       username: req.user.username,
+      online: true,
       title: title.slice(0, 120),
       content: content.slice(0, 2000),
       category,
+      color,
       createdAt,
+      reactions: {},
       comments: []
     });
   } catch (err) {
     console.error('Erro ao criar post:', err);
     res.status(500).json({ error: 'Erro ao publicar no mural.' });
+  }
+});
+
+router.post('/posts/:id/react', authMiddleware, async (req, res) => {
+  try {
+    const allowed = ['🔥', '🏆', '❤️', '🎮', '😂'];
+    const emoji = String(req.body.emoji || '').trim();
+    if (!allowed.includes(emoji)) return res.status(400).json({ error: 'Emoji inválido.' });
+
+    const postId = req.params.id;
+    const userId = String(req.user.id);
+
+    const existing = await pool.query(
+      'SELECT 1 FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3',
+      [postId, userId, emoji]
+    );
+
+    if (existing.rowCount > 0) {
+      await pool.query(
+        'DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3',
+        [postId, userId, emoji]
+      );
+    } else {
+      await pool.query(
+        'INSERT INTO post_reactions (post_id, user_id, emoji) VALUES ($1, $2, $3)',
+        [postId, userId, emoji]
+      );
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao reagir:', err);
+    res.status(500).json({ error: 'Erro ao registrar reação.' });
   }
 });
 
@@ -191,6 +283,7 @@ router.post('/posts/:id/comments', authMiddleware, async (req, res) => {
       postId: req.params.id,
       userId: req.user.id,
       username: req.user.username,
+      online: true,
       content: content.slice(0, 600),
       createdAt
     });
@@ -219,7 +312,7 @@ router.get('/chat', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT * FROM (
-        SELECT m.id, m.user_id, u.username, m.message, m.created_at
+        SELECT m.id, m.user_id, u.username, u.last_seen, m.message, m.created_at
         FROM chat_messages m
         JOIN users u ON u.id::text = m.user_id::text
         ORDER BY m.created_at DESC
@@ -232,6 +325,7 @@ router.get('/chat', authMiddleware, async (req, res) => {
       id: r.id,
       userId: r.user_id,
       username: r.username,
+      online: isUserOnline(r.last_seen),
       message: r.message,
       createdAt: Number(r.created_at)
     })));
@@ -257,6 +351,7 @@ router.post('/chat', authMiddleware, async (req, res) => {
       id,
       userId: req.user.id,
       username: req.user.username,
+      online: true,
       message: message.slice(0, 500),
       createdAt
     });

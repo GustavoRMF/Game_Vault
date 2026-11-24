@@ -1,8 +1,55 @@
 // ========================================
-// GameVault - Perfil Público, Mural & Chat
+// GameVault - Perfil Público, Mural (Cores/Emojis/Reações) & Chat Online
 // ========================================
 
 let chatPollTimer = null;
+const REACTION_EMOJIS = ['🔥', '🏆', '❤️', '🎮', '😂'];
+
+function onlineDotHtml(isOnline) {
+  return `<span class="online-dot ${isOnline ? 'is-online' : ''}" title="${isOnline ? 'Online agora' : 'Offline'}"></span>`;
+}
+
+// Injeta seletor de cores e barra de emojis nos formulários do Mural e Chat
+function initCommunityEnhancements() {
+  const postForm = document.getElementById('post-form');
+  if (postForm && !document.getElementById('postColorInput')) {
+    const actionsDiv = postForm.querySelector('.form-actions');
+    const extras = document.createElement('div');
+    extras.innerHTML = `
+      <input type="hidden" id="postColorInput" value="blue">
+      <div class="color-picker-row">
+        <span style="font-size:0.85rem; color:var(--muted);">🎨 Cor do card:</span>
+        <button type="button" class="color-swatch selected" data-color="blue" title="Azul PSN"></button>
+        <button type="button" class="color-swatch" data-color="purple" title="Roxo Arcade"></button>
+        <button type="button" class="color-swatch" data-color="emerald" title="Verde Esmeralda"></button>
+        <button type="button" class="color-swatch" data-color="gold" title="Dourado Lendário"></button>
+        <button type="button" class="color-swatch" data-color="crimson" title="Vermelho Alerta"></button>
+        <button type="button" class="color-swatch" data-color="cyan" title="Ciano Neon"></button>
+      </div>
+      ${typeof buildEmojiBarHtml === 'function' ? buildEmojiBarHtml('post-content') : ''}
+    `;
+    postForm.insertBefore(extras, actionsDiv);
+  }
+
+  const chatCard = document.querySelector('#tab-chat .chat-card');
+  const chatForm = document.getElementById('chat-form');
+  if (chatCard && chatForm && !document.getElementById('chatEmojiBarWrap')) {
+    const wrap = document.createElement('div');
+    wrap.id = 'chatEmojiBarWrap';
+    wrap.innerHTML = typeof buildEmojiBarHtml === 'function' ? buildEmojiBarHtml('chat-input') : '';
+    chatCard.insertBefore(wrap, chatForm);
+  }
+
+  const chatHeader = document.querySelector('#tab-chat .chat-header div');
+  if (chatHeader && !document.getElementById('onlineCountBadge')) {
+    const badge = document.createElement('span');
+    badge.id = 'onlineCountBadge';
+    badge.className = 'online-pill';
+    badge.style.marginTop = '6px';
+    badge.innerHTML = `<span class="online-dot is-online"></span> Online`;
+    chatHeader.appendChild(badge);
+  }
+}
 
 // ===== Modal Perfil Público =====
 async function openPlayerProfile(userId) {
@@ -24,11 +71,11 @@ async function openPlayerProfile(userId) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Erro ao carregar perfil');
 
-    titleEl.textContent = `🎮 Biblioteca de ${data.user.username}`;
+    titleEl.innerHTML = `${onlineDotHtml(data.user.online)} 🎮 Biblioteca de ${escapeHtml(data.user.username)}`;
     const since = data.user.createdAt
       ? `Membro desde ${new Date(data.user.createdAt).toLocaleDateString('pt-BR')}`
       : 'Jogador da comunidade GameVault';
-    subEl.textContent = since;
+    subEl.textContent = `${data.user.online ? '🟢 Online agora • ' : ''}${since}`;
 
     statsEl.innerHTML = `
       <div class="stat-card"><div class="value">${data.stats.totalGames}</div><div class="label">Jogos</div></div>
@@ -80,6 +127,7 @@ document.getElementById('profile-modal')?.addEventListener('click', (e) => {
 
 // ===== Mural de Publicações =====
 async function loadCommunityPosts() {
+  initCommunityEnhancements();
   const listEl = document.getElementById('posts-list');
   if (!listEl) return;
   listEl.innerHTML = '<p class="empty-msg">Carregando publicações...</p>';
@@ -97,11 +145,24 @@ async function loadCommunityPosts() {
     listEl.innerHTML = posts.map(post => {
       const isOwner = currentUser && String(post.userId) === String(currentUser.id);
       const dateStr = new Date(post.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+      const themeClass = `theme-${escapeHtml(post.color || 'blue')}`;
+
+      const reactionsHtml = REACTION_EMOJIS.map(emoji => {
+        const info = post.reactions?.[emoji] || { count: 0, reacted: false };
+        return `
+          <button type="button" class="reaction-btn ${info.reacted ? 'active' : ''}" data-react-post="${escapeHtml(post.id)}" data-emoji="${emoji}">
+            <span>${emoji}</span>
+            ${info.count > 0 ? `<span>${info.count}</span>` : ''}
+          </button>
+        `;
+      }).join('');
+
       const commentsHtml = (post.comments || []).map(c => {
         const isCommentOwner = currentUser && String(c.userId) === String(currentUser.id);
         return `
           <div class="comment-item">
             <div>
+              ${onlineDotHtml(c.online)}
               <strong class="clickable-user" data-profile-id="${escapeHtml(String(c.userId))}">${escapeHtml(c.username)}</strong>:
               <span>${escapeHtml(c.content)}</span>
             </div>
@@ -111,18 +172,19 @@ async function loadCommunityPosts() {
       }).join('');
 
       return `
-        <article class="post-card">
+        <article class="post-card ${themeClass}">
           <div class="post-header">
             <div>
               <span class="badge">${escapeHtml(post.category)}</span>
               <h3 class="post-title">${escapeHtml(post.title)}</h3>
               <span class="post-meta">
-                por <strong class="clickable-user" data-profile-id="${escapeHtml(String(post.userId))}">${escapeHtml(post.username)}</strong> • ${dateStr}
+                por ${onlineDotHtml(post.online)}<strong class="clickable-user" data-profile-id="${escapeHtml(String(post.userId))}">${escapeHtml(post.username)}</strong> • ${dateStr}
               </span>
             </div>
             ${isOwner ? `<button type="button" class="btn-delete btn-small" data-del-post="${escapeHtml(post.id)}">🗑️ Excluir</button>` : ''}
           </div>
           <p class="post-body">${escapeHtml(post.content)}</p>
+          <div class="post-reactions">${reactionsHtml}</div>
           <div class="post-comments">
             ${commentsHtml}
             <form class="comment-form" data-post-id="${escapeHtml(post.id)}">
@@ -143,6 +205,7 @@ document.getElementById('post-form')?.addEventListener('submit', async (e) => {
   const title = document.getElementById('post-title').value.trim();
   const category = document.getElementById('post-category').value;
   const content = document.getElementById('post-content').value.trim();
+  const color = document.getElementById('postColorInput')?.value || 'blue';
   if (!title || !content) return;
 
   const btn = e.target.querySelector('button[type="submit"]');
@@ -151,11 +214,12 @@ document.getElementById('post-form')?.addEventListener('submit', async (e) => {
     const res = await apiFetch('/api/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, category, content })
+      body: JSON.stringify({ title, category, content, color })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Erro ao publicar');
     e.target.reset();
+    if (document.getElementById('postColorInput')) document.getElementById('postColorInput').value = 'blue';
     await loadCommunityPosts();
     showToast('Publicado no mural!');
   } catch (err) {
@@ -166,6 +230,19 @@ document.getElementById('post-form')?.addEventListener('submit', async (e) => {
 });
 
 document.getElementById('posts-list')?.addEventListener('click', async (e) => {
+  const reactBtn = e.target.closest('[data-react-post]');
+  if (reactBtn) {
+    const postId = reactBtn.dataset.reactPost;
+    const emoji = reactBtn.dataset.emoji;
+    const res = await apiFetch(`/api/posts/${encodeURIComponent(postId)}/react`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emoji })
+    });
+    if (res.ok) loadCommunityPosts();
+    return;
+  }
+
   const profileTrigger = e.target.closest('[data-profile-id]');
   if (profileTrigger) {
     openPlayerProfile(profileTrigger.dataset.profileId);
@@ -216,6 +293,7 @@ document.getElementById('refresh-posts-btn')?.addEventListener('click', loadComm
 
 // ===== Chat Global =====
 async function loadChatMessages(silent = false) {
+  initCommunityEnhancements();
   const box = document.getElementById('chat-messages');
   if (!box) return;
   if (!silent) box.innerHTML = '<p class="empty-msg">Carregando chat...</p>';
@@ -236,6 +314,7 @@ async function loadChatMessages(silent = false) {
       return `
         <div class="chat-msg ${isMe ? 'mine' : ''}">
           <div class="chat-msg-head">
+            ${onlineDotHtml(m.online)}
             <strong class="clickable-user" data-profile-id="${escapeHtml(String(m.userId))}">${escapeHtml(m.username)}</strong>
             <span>${timeStr}</span>
             ${isMe ? `<button type="button" class="btn-delete btn-small" data-del-chat="${escapeHtml(m.id)}">✕</button>` : ''}
@@ -300,3 +379,4 @@ document.getElementById('chat-messages')?.addEventListener('click', async (e) =>
 });
 
 document.getElementById('refresh-chat-btn')?.addEventListener('click', () => loadChatMessages());
+document.addEventListener('DOMContentLoaded', initCommunityEnhancements);

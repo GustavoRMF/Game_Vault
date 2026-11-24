@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { pool } = require('../db');
 
 const JWT_SECRET = process.env.JWT_SECRET || crypto
   .createHash('sha256')
@@ -47,12 +48,23 @@ function verifyToken(token) {
   }
 }
 
+const lastPingCache = new Map();
+
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   const user = verifyToken(token);
   if (!user) return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
   req.user = user;
+
+  // Atualiza last_seen no máximo a cada 20s para não sobrecarregar o banco
+  const now = Date.now();
+  const uid = String(user.id);
+  if (now - (lastPingCache.get(uid) || 0) > 20000) {
+    lastPingCache.set(uid, now);
+    pool.query('UPDATE users SET last_seen = $1 WHERE id::text = $2', [now, uid]).catch(() => {});
+  }
+
   next();
 }
 
