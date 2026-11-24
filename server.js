@@ -857,8 +857,8 @@ app.post('/api/import/psn', authMiddleware, async (req, res) => {
     const authorization = await psn.exchangeAccessCodeForAuthTokens(accessCode);
 
     const [playedRes, trophyRes] = await Promise.all([
-      psn.getUserPlayedGames(authorization, 'me', { limit: 250 }),
-      psn.getUserTitles(authorization, 'me', { limit: 250 }).catch(() => ({ trophyTitles: [] }))
+      psn.getUserPlayedGames(authorization, 'me', { limit: 200 }),
+      psn.getUserTitles(authorization, 'me', { limit: 200 }).catch(() => ({ trophyTitles: [] }))
     ]);
 
     const playedTitles = Array.isArray(playedRes?.titles) ? [...playedRes.titles] : [];
