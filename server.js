@@ -580,7 +580,6 @@ app.delete('/api/chat/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Erro ao excluir mensagem.' });
   }
 });
-
 // ===== Rotas CRUD da Biblioteca (por usuário) =====
 app.get('/api/games', authMiddleware, async (req, res) => {
   try {
@@ -797,7 +796,6 @@ app.post('/api/wishlist/:id/move-to-library', authMiddleware, async (req, res) =
 function parsePsnDurationHours(duration) {
   if (duration === null || duration === undefined) return 0;
 
-  // Caso venha numérico (segundos)
   if (typeof duration === 'number' && Number.isFinite(duration)) {
     return Math.round((duration / 3600) * 10) / 10;
   }
@@ -809,7 +807,6 @@ function parsePsnDurationHours(duration) {
     return Math.round((Number(str) / 3600) * 10) / 10;
   }
 
-  // Formato ISO-8601 com suporte a dias, horas, minutos e segundos (ex: P2DT4H15M20S ou PT120H30M)
   const match = str.match(/P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?/i);
   if (!match) return 0;
 
@@ -879,7 +876,6 @@ app.post('/api/import/psn', authMiddleware, async (req, res) => {
       existingMap.set(`${normalizeTitleKey(row.title)}|${row.platform}`, row);
     }
 
-    // Ordena do mais recente para o mais antigo com base em lastPlayedDateTime (se existir)
     playedTitles.sort((a, b) => {
       const ta = a.lastPlayedDateTime ? Date.parse(a.lastPlayedDateTime) : 0;
       const tb = b.lastPlayedDateTime ? Date.parse(b.lastPlayedDateTime) : 0;
@@ -900,13 +896,16 @@ app.post('/api/import/psn', authMiddleware, async (req, res) => {
       const key = `${normalizeTitleKey(rawTitle)}|${platform}`;
       const hours = parsePsnDurationHours(item.playDuration);
       const lastPlayedTs = item.lastPlayedDateTime ? Date.parse(item.lastPlayedDateTime) : 0;
-      // Garante que o item mais recente tenha sempre o maior added_at
       const itemTimestamp = lastPlayedTs > 0 ? lastPlayedTs : (baseTimestamp - i * 1000);
 
       if (existingMap.has(key)) {
         const existing = existingMap.get(key);
+        const newHours = Math.max(hours, Number(existing.hours || 0));
+        await pool.query(
+          'UPDATE games SET hours = $1, added_at = $2 WHERE id = $3',
+          [newHours, itemTimestamp, existing.id]
+        );
         if (hours > Number(existing.hours || 0)) {
-          await pool.query('UPDATE games SET hours = $1 WHERE id = $2', [hours, existing.id]);
           updatedHours++;
         } else {
           skipped++;
