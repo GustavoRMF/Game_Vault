@@ -89,6 +89,10 @@ function switchAuthMode(mode) {
   const ruleBadge = document.getElementById('password-rule-badge');
   const registerTip = document.getElementById('register-tip');
   const forgotLinkBox = document.getElementById('forgot-link-box');
+  const box2fa = document.getElementById('login-2fa-box');
+  const code2faInput = document.getElementById('auth-2fa-code');
+  if (box2fa) box2fa.classList.add('hidden');
+  if (code2faInput) code2faInput.value = '';
 
   if (mode === 'forgot') {
     authForm.classList.add('hidden');
@@ -136,6 +140,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const username = document.getElementById('auth-username').value.trim();
   const password = document.getElementById('auth-password').value;
+  const totpCode = document.getElementById('auth-2fa-code')?.value.trim() || '';
   const submitBtn = document.getElementById('auth-submit-btn');
 
   if (authMode === 'register' && password.length < 8) {
@@ -149,13 +154,28 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password, totpCode })
     });
     const data = await res.json();
+
+    // Conta possui 2FA ativo: revela o campo de 6 dígitos
+    if (data.requires2FA) {
+      const box2fa = document.getElementById('login-2fa-box');
+      const codeInput = document.getElementById('auth-2fa-code');
+      if (box2fa) box2fa.classList.remove('hidden');
+      if (codeInput) {
+        codeInput.value = '';
+        codeInput.focus();
+      }
+      showToast(data.error || data.message || 'Informe o código 2FA.');
+      return;
+    }
+
     if (!res.ok) throw new Error(data.error || 'Erro de autenticação');
 
     saveSession(data.token, data.user);
     document.getElementById('auth-form').reset();
+    document.getElementById('login-2fa-box')?.classList.add('hidden');
     updateAuthUI();
 
     await loadGames();
@@ -163,6 +183,9 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     if (typeof loadWishlist === 'function') {
       await loadWishlist();
       renderWishlist();
+    }
+    if (typeof loadMyProfile === 'function') {
+      await loadMyProfile();
     }
 
     showToast(authMode === 'login' ? `Bem-vindo de volta, ${data.user.username}!` : `Conta criada! Bem-vindo, ${data.user.username}!`);
@@ -833,6 +856,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
     if (target === 'profile' && typeof loadMyProfile === 'function') loadMyProfile();
     if (target === 'library') renderCharts();
+    if (target === 'settings') load2FAStatus();
     if (target === 'wishlist' && typeof renderWishlist === 'function') renderWishlist();
     if (target === 'ranking') loadRanking();
     if (target === 'posts' && typeof loadCommunityPosts === 'function') loadCommunityPosts();
@@ -1025,9 +1049,108 @@ window.addEventListener('appinstalled', () => {
   if (authToken && currentUser) {
     await loadGames();
     render();
-   if (typeof loadMyProfile === 'function') {
-  await loadMyProfile();
+    if (typeof loadWishlist === 'function') {
+      await loadWishlist();
       renderWishlist();
+    }
+    if (typeof loadMyProfile === 'function') {
+      await loadMyProfile();
     }
   }
 })();
+
+// ===== Autenticação em 2 Etapas (2FA Opcional) =====
+async function load2FAStatus() {
+  const badge = document.getElementById('twofa-status-badge');
+  const disabledView = document.getElementById('twofa-disabled-view');
+  const enabledView = document.getElementById('twofa-enabled-view');
+  if (!badge || !authToken) return;
+
+  try {
+    const res = await apiFetch('/api/auth/2fa/status');
+    if (!res.ok) return;
+    const { enabled } = await res.json();
+
+    if (enabled) {
+      badge.textContent = '🛡️ Ativado';
+      badge.className = 'badge status-Jogando';
+      disabledView?.classList.add('hidden');
+      enabledView?.classList.remove('hidden');
+    } else {
+      badge.textContent = 'Desativado';
+      badge.className = 'badge';
+      enabledView?.classList.add('hidden');
+      disabledView?.classList.remove('hidden');
+      document.getElementById('twofa-setup-panel')?.classList.add('hidden');
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+document.getElementById('start-2fa-setup-btn')?.addEventListener('click', async () => {
+  try {
+    const res = await apiFetch('/api/auth/2fa/setup', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro ao gerar chave 2FA');
+
+    document.getElementById('twofa-secret-code').textContent = data.secret;
+    document.getElementById('twofa-qr-img').src =
+      `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.otpauthUrl)}`;
+    document.getElementById('twofa-verify-input').value = '';
+    document.getElementById('twofa-setup-panel').classList.remove('hidden');
+  } catch (err) {
+    if (err.message !== 'Sessão expirada') showToast(err.message);
+  }
+});
+
+document.getElementById('cancel-2fa-setup-btn')?.addEventListener('click', () => {
+  document.getElementById('twofa-setup-panel')?.classList.add('hidden');
+});
+
+document.getElementById('confirm-2fa-enable-btn')?.addEventListener('click', async () => {
+  const code = document.getElementById('twofa-verify-input').value.trim();
+  if (!/^\d{6}$/.test(code)) {
+    showToast('Digite os 6 dígitos mostrados no aplicativo autenticador.');
+    return;
+  }
+
+  try {
+    const res = await apiFetch('/api/auth/2fa/enable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Código inválido');
+
+    showToast('Autenticação 2FA ativada com sucesso! 🛡️');
+    await load2FAStatus();
+  } catch (err) {
+    if (err.message !== 'Sessão expirada') showToast(err.message);
+  }
+});
+
+document.getElementById('disable-2fa-btn')?.addEventListener('click', async () => {
+  const code = document.getElementById('twofa-disable-input').value.trim();
+  if (!/^\d{6}$/.test(code)) {
+    showToast('Digite o código atual de 6 dígitos para desativar.');
+    return;
+  }
+
+  try {
+    const res = await apiFetch('/api/auth/2fa/disable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Código inválido');
+
+    document.getElementById('twofa-disable-input').value = '';
+    showToast('Autenticação 2FA desativada.');
+    await load2FAStatus();
+  } catch (err) {
+    if (err.message !== 'Sessão expirada') showToast(err.message);
+  }
+});
