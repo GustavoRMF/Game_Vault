@@ -1,4 +1,4 @@
-require('dotenv').config();
+try { require('dotenv').config(); } catch {}
 const express = require('express');
 const path = require('path');
 const { initDb } = require('./db');
