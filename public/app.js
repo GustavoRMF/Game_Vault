@@ -932,6 +932,57 @@ if (importPsnBtn) {
   });
 }
 
+// ===== Botões de Informação (ℹ️ PSN & Steam) =====
+document.getElementById('toggle-psn-info')?.addEventListener('click', () => {
+  document.getElementById('psn-info-box')?.classList.toggle('hidden');
+});
+
+document.getElementById('toggle-steam-info')?.addEventListener('click', () => {
+  document.getElementById('steam-info-box')?.classList.toggle('hidden');
+});
+
+// ===== Importação Steam =====
+const importSteamBtn = document.getElementById('import-steam-btn');
+if (importSteamBtn) {
+  importSteamBtn.addEventListener('click', async () => {
+    const input = document.getElementById('steam-profile-input');
+    const statusEl = document.getElementById('steam-status');
+    const steamInput = input.value.trim();
+
+    if (!steamInput) {
+      showToast('Cole o link do seu perfil Steam ou SteamID64.');
+      return;
+    }
+
+    importSteamBtn.disabled = true;
+    importSteamBtn.textContent = '⏳ Sincronizando Steam...';
+    statusEl.textContent = 'Buscando biblioteca, horas jogadas e conquistas na Steam...';
+
+    try {
+      const res = await apiFetch('/api/import/steam', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steamInput })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao importar da Steam');
+
+      await loadGames();
+      render();
+
+      const resumo = `✅ ${data.imported} novo(s), ${data.updatedHours} hora(s) atualizada(s), ${data.skipped} já existente(s) ignorado(s).`;
+      statusEl.textContent = resumo;
+      showToast(`${data.imported} jogo(s) importado(s) da Steam!`);
+    } catch (err) {
+      statusEl.textContent = '';
+      if (err.message !== 'Sessão expirada') showToast(err.message);
+    } finally {
+      importSteamBtn.disabled = false;
+      importSteamBtn.textContent = '🖥️ Sincronizar Steam';
+    }
+  });
+}
+
 document.getElementById('search').addEventListener('input', renderGames);
 ['filter-platform', 'filter-status', 'sort-by'].forEach(id => {
   document.getElementById(id).addEventListener('change', renderGames);

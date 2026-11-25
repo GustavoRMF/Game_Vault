@@ -408,11 +408,26 @@
 
     <!-- ================= ABA 6: AJUSTES & INTEGRAÇÕES ================= -->
     <div id="tab-settings" class="tab-content hidden">
+      <!-- Sincronizar PSN -->
       <section class="form-section" style="margin-top: 0;">
-        <h2>🎮 Sincronizar PlayStation Network (PSN)</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+          <h2 style="margin:0;">🎮 Sincronizar PlayStation Network (PSN)</h2>
+          <button type="button" id="toggle-psn-info" class="btn-secondary btn-small" title="Ver passo a passo de como sincronizar a PSN">ℹ️ Como pegar o código?</button>
+        </div>
         <p class="subtitle" style="margin-bottom: 14px;">
-          Importa seus jogos jogados, horas e platinas da PSN sem duplicar itens já cadastrados.
+          Importa seus jogos jogados, horas e platinas da PSN em ordem do último jogado, sem duplicar itens já cadastrados.
         </p>
+
+        <div id="psn-info-box" class="register-tip hidden" style="margin-bottom: 14px;">
+          <strong>📋 Passo a passo para importar da PSN:</strong>
+          <ol style="margin: 8px 0 0 18px; line-height: 1.65;">
+            <li>Clique em <strong>1️⃣ Abrir PlayStation.com</strong> e faça login na sua conta PSN.</li>
+            <li>Com a aba da PlayStation aberta e logada, clique em <strong>2️⃣ Pegar código NPSSO</strong>.</li>
+            <li>Vai abrir uma página branca com um texto parecido com <code>{"npsso":"AbCdEf123..."}</code>.</li>
+            <li>Copie todo esse texto (ou só o código dentro das aspas), cole no campo abaixo e clique em <strong>🎮 Sincronizar PSN</strong>.</li>
+          </ol>
+        </div>
+
         <div class="backup-actions" style="flex-wrap: wrap;">
           <a href="https://www.playstation.com" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;">1️⃣ Abrir PlayStation.com</a>
           <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;">2️⃣ Pegar código NPSSO</a>
@@ -422,6 +437,35 @@
         <p id="psn-status" class="backup-status" style="margin-top: 10px;"></p>
       </section>
 
+      <!-- Sincronizar Steam -->
+      <section class="form-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+          <h2 style="margin:0;">🖥️ Sincronizar Steam Store (PC)</h2>
+          <button type="button" id="toggle-steam-info" class="btn-secondary btn-small" title="Ver passo a passo de como sincronizar a Steam">ℹ️ Como sincronizar?</button>
+        </div>
+        <p class="subtitle" style="margin-bottom: 14px;">
+          Importa seus jogos de PC, horas jogadas exatas, capas e conquistas 100% da Steam na ordem do último jogado.
+        </p>
+
+        <div id="steam-info-box" class="register-tip hidden" style="margin-bottom: 14px;">
+          <strong>📋 Passo a passo para importar da Steam:</strong>
+          <ol style="margin: 8px 0 0 18px; line-height: 1.65;">
+            <li>Abra seu perfil na Steam e clique em <strong>Editar Perfil → Privacidade</strong> (ou clique no botão <strong>1️⃣ Privacidade Steam</strong> abaixo).</li>
+            <li>Deixe as opções <strong>Meu perfil</strong> e <strong>Detalhes dos jogos</strong> marcadas como <strong>Público</strong>.</li>
+            <li>Copie o link do seu perfil Steam (ex: <code>https://steamcommunity.com/id/seu_nome</code> ou <code>.../profiles/7656...</code>).</li>
+            <li>Cole o link no campo abaixo e clique em <strong>🖥️ Sincronizar Steam</strong>.</li>
+          </ol>
+        </div>
+
+        <div class="backup-actions" style="flex-wrap: wrap;">
+          <a href="https://steamcommunity.com/my/edit/settings" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none;">1️⃣ Privacidade Steam</a>
+          <input type="text" id="steam-profile-input" placeholder="Cole o link do seu perfil Steam (steamcommunity.com/id/...) ou SteamID64" style="flex:1; min-width:260px;">
+          <button type="button" id="import-steam-btn" class="btn-primary">🖥️ Sincronizar Steam</button>
+        </div>
+        <p id="steam-status" class="backup-status" style="margin-top: 10px;"></p>
+      </section>
+
+      <!-- Backup JSON -->
       <section class="form-section">
         <h2>💾 Backup e Restauração (JSON)</h2>
         <p class="subtitle" style="margin-bottom: 14px;">
