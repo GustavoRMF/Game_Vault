@@ -1,5 +1,5 @@
 // ========================================
-// GameVault - Meu Perfil (30 Capas de Jogos, Foto, Nome & Consoles)
+// GameVault - Meu Perfil (30 Capas de Jogos, Foto, Nome de Exibição & Consoles)
 // ========================================
 
 const PRESET_GAMER_AVATARS = [
@@ -36,13 +36,13 @@ const PRESET_GAMER_AVATARS = [
 ];
 
 let myProfileData = {
+  loginUsername: '',
   username: '',
   avatar: '',
   birthday: '',
   consoles: []
 };
 
-// Renderiza o avatar (foto base64, URL de capa ou inicial) em qualquer lugar do app
 window.renderAvatarHtml = function (avatarValue, username = '?', size = 34) {
   let val = String(avatarValue || '').trim();
 
@@ -63,11 +63,12 @@ window.renderAvatarHtml = function (avatarValue, username = '?', size = 34) {
 function updateHeaderUserBadge() {
   const pill = document.querySelector('.user-pill');
   if (!pill || !currentUser) return;
-  const avatarHtml = window.renderAvatarHtml(myProfileData.avatar, currentUser.username, 24);
+  const shownName = myProfileData.username || currentUser.displayName || currentUser.username;
+  const avatarHtml = window.renderAvatarHtml(myProfileData.avatar, shownName, 24);
   pill.style.display = 'inline-flex';
   pill.style.alignItems = 'center';
   pill.style.gap = '8px';
-  pill.innerHTML = `${avatarHtml} <strong id="current-username">${escapeHtml(currentUser.username)}</strong>`;
+  pill.innerHTML = `${avatarHtml} <strong id="current-username">${escapeHtml(shownName)}</strong>`;
 }
 
 function renderAvatarPickerGrid() {
@@ -88,7 +89,7 @@ function renderAvatarPickerGrid() {
 function updateProfilePreview() {
   const previewBox = document.getElementById('profile-avatar-preview');
   const nameInput = document.getElementById('profile-username-input');
-  const displayName = (nameInput?.value || currentUser?.username || 'Jogador').trim();
+  const displayName = (nameInput?.value || myProfileData.username || currentUser?.username || 'Jogador').trim();
 
   if (previewBox) {
     previewBox.innerHTML = window.renderAvatarHtml(myProfileData.avatar, displayName, 84);
@@ -103,6 +104,7 @@ async function loadMyProfile() {
     if (!res.ok) return;
     const data = await res.json();
     myProfileData = {
+      loginUsername: data.loginUsername || currentUser?.username || '',
       username: data.username || currentUser?.username || '',
       avatar: data.avatar || '',
       birthday: data.birthday || '',
@@ -111,8 +113,12 @@ async function loadMyProfile() {
 
     const nameInput = document.getElementById('profile-username-input');
     const bdayInput = document.getElementById('profile-birthday-input');
+    const loginHint = document.getElementById('profile-login-hint');
     if (nameInput) nameInput.value = myProfileData.username;
     if (bdayInput) bdayInput.value = myProfileData.birthday;
+    if (loginHint) {
+      loginHint.textContent = `🔑 Seu usuário de login permanece fixo: ${myProfileData.loginUsername}`;
+    }
 
     document.querySelectorAll('input[name="profile-console"]').forEach(cb => {
       cb.checked = myProfileData.consoles.includes(cb.value);
@@ -125,7 +131,6 @@ async function loadMyProfile() {
   }
 }
 
-// Redimensiona a foto escolhida pelo usuário para 180x180px JPEG leve
 function resizeImageToDataUrl(file, maxSize = 180) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -152,7 +157,6 @@ function resizeImageToDataUrl(file, maxSize = 180) {
   });
 }
 
-// Clique nas capas de jogos predefinidas
 document.getElementById('avatar-presets-grid')?.addEventListener('click', (e) => {
   const btn = e.target.closest('.avatar-preset-item');
   if (!btn) return;
@@ -160,7 +164,6 @@ document.getElementById('avatar-presets-grid')?.addEventListener('click', (e) =>
   updateProfilePreview();
 });
 
-// Upload de foto personalizada
 document.getElementById('profile-photo-input')?.addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
   e.target.value = '';
@@ -176,7 +179,6 @@ document.getElementById('profile-photo-input')?.addEventListener('change', async
   }
 });
 
-// Remover foto/avatar
 document.getElementById('profile-clear-avatar-btn')?.addEventListener('click', () => {
   myProfileData.avatar = '';
   updateProfilePreview();
@@ -184,15 +186,14 @@ document.getElementById('profile-clear-avatar-btn')?.addEventListener('click', (
 
 document.getElementById('profile-username-input')?.addEventListener('input', updateProfilePreview);
 
-// Salvar formulário de Meu Perfil
 document.getElementById('my-profile-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const username = document.getElementById('profile-username-input').value.trim();
+  const displayName = document.getElementById('profile-username-input').value.trim();
   const birthday = document.getElementById('profile-birthday-input').value;
   const consoles = Array.from(document.querySelectorAll('input[name="profile-console"]:checked')).map(cb => cb.value);
 
-  if (username.length < 3) {
-    showToast('O nome do perfil deve ter pelo menos 3 caracteres.');
+  if (displayName.length < 2) {
+    showToast('O nome de exibição deve ter pelo menos 2 caracteres.');
     return;
   }
 
@@ -204,7 +205,7 @@ document.getElementById('my-profile-form')?.addEventListener('submit', async (e)
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        username,
+        username: displayName,
         avatar: myProfileData.avatar,
         birthday,
         consoles
@@ -213,19 +214,24 @@ document.getElementById('my-profile-form')?.addEventListener('submit', async (e)
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Erro ao salvar perfil');
 
-    if (data.token && data.profile) {
-      saveSession(data.token, { id: data.profile.id, username: data.profile.username });
+    if (data.profile) {
       myProfileData = {
+        loginUsername: data.profile.loginUsername,
         username: data.profile.username,
         avatar: data.profile.avatar,
         birthday: data.profile.birthday,
         consoles: data.profile.consoles
       };
+      // Mantém currentUser.username como login original e salva displayName separado
+      saveSession(authToken, {
+        ...currentUser,
+        displayName: data.profile.username
+      });
     }
 
     updateHeaderUserBadge();
     updateProfilePreview();
-    showToast('Perfil atualizado com sucesso! 👤');
+    showToast('Perfil atualizado! Seu login de acesso continua o mesmo. 👤');
   } catch (err) {
     if (err.message !== 'Sessão expirada') showToast(err.message);
   } finally {

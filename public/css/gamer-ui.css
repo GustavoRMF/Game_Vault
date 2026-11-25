@@ -56,9 +56,13 @@ body {
   right: 20px;
   bottom: 22px;
   z-index: 850;
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 12px;
+}
+
+#app-content:not(.hidden) ~ .gamer-fab-stack {
+  display: flex;
 }
 
 .gamer-fab {
@@ -321,6 +325,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 10px;
+  max-height: 280px; overflow-y: auto; padding-right: 4px;
 }
 
 .avatar-preset-item {
@@ -388,4 +393,91 @@ body {
 .console-chip input[type="checkbox"] {
   width: auto;
   accent-color: #0ea5e9;
+}
+
+/* ===== Tela de Login Animada com Mural de Capas ===== */
+.login-showcase-wrapper {
+  position: relative;
+  min-height: 76vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 28px 16px;
+}
+
+.login-covers-backdrop {
+  position: absolute;
+  inset: -20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  transform: rotate(-6deg) scale(1.08);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.42;
+}
+
+.login-covers-row {
+  display: flex;
+  gap: 14px;
+  width: max-content;
+}
+
+.login-covers-row img {
+  width: 128px;
+  height: 184px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+}
+
+.login-covers-row.row-left {
+  animation: loginMarqueeLeft 38s linear infinite;
+}
+
+.login-covers-row.row-right {
+  animation: loginMarqueeRight 42s linear infinite;
+}
+
+@keyframes loginMarqueeLeft {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes loginMarqueeRight {
+  0%   { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.login-covers-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(5, 8, 20, 0.45) 0%, rgba(5, 8, 20, 0.94) 78%);
+}
+
+.login-glass-card {
+  position: relative;
+  z-index: 2;
+  background: rgba(11, 18, 38, 0.84) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.45) !important;
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.8), 0 0 32px rgba(56, 189, 248, 0.22) !important;
+  animation: loginCardFloat 5s ease-in-out infinite;
+}
+
+@keyframes loginCardFloat {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-5px); }
+}
+
+.login-console-pills {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
 }

@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool } = require('../db');
-const { authMiddleware, genId, createToken } = require('../middleware/auth');
+const { authMiddleware, genId } = require('../middleware/auth');
 
 const router = express.Router();
 const ONLINE_WINDOW_MS = 95 * 1000;
@@ -34,11 +34,11 @@ function mapGameRow(row) {
   };
 }
 
-// ===== Meu Perfil (Leitura e Edição) =====
+// ===== Meu Perfil (Leitura e Edição sem alterar o login) =====
 router.get('/me/profile', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, username, avatar, birthday, consoles, created_at FROM users WHERE id::text = $1',
+      'SELECT id, username, display_name, avatar, birthday, consoles, created_at FROM users WHERE id::text = $1',
       [String(req.user.id)]
     );
     const u = result.rows[0];
@@ -46,7 +46,8 @@ router.get('/me/profile', authMiddleware, async (req, res) => {
 
     res.json({
       id: u.id,
-      username: u.username,
+      loginUsername: u.username,
+      username: (u.display_name || '').trim() || u.username,
       avatar: u.avatar || '',
       birthday: u.birthday || '',
       consoles: parseConsoles(u.consoles),
@@ -61,7 +62,7 @@ router.get('/me/profile', authMiddleware, async (req, res) => {
 router.put('/me/profile', authMiddleware, async (req, res) => {
   try {
     const userId = String(req.user.id);
-    const username = String(req.body.username || '').trim();
+    const displayName = String(req.body.username || '').trim();
     const avatar = String(req.body.avatar || '').trim();
     const birthday = String(req.body.birthday || '').trim().slice(0, 20);
     const allowedConsoles = ['PS3', 'PS4', 'PS5', 'PC', 'Xbox', 'Switch'];
@@ -69,38 +70,29 @@ router.put('/me/profile', authMiddleware, async (req, res) => {
       ? req.body.consoles.filter(c => allowedConsoles.includes(c))
       : [];
 
-    if (username.length < 3 || username.length > 30) {
-      return res.status(400).json({ error: 'O nome do perfil deve ter entre 3 e 30 caracteres.' });
+    if (displayName.length < 2 || displayName.length > 30) {
+      return res.status(400).json({ error: 'O nome de exibição deve ter entre 2 e 30 caracteres.' });
     }
 
     if (avatar.length > 450000) {
       return res.status(400).json({ error: 'A imagem escolhida é muito grande. Escolha uma menor.' });
     }
 
-    const dup = await pool.query(
-      'SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id::text <> $2',
-      [username, userId]
-    );
-    if (dup.rowCount > 0) {
-      return res.status(409).json({ error: 'Este nome de perfil já está sendo usado por outro jogador.' });
-    }
-
     const updateRes = await pool.query(
       `UPDATE users
-       SET username = $1, avatar = $2, birthday = $3, consoles = $4
+       SET display_name = $1, avatar = $2, birthday = $3, consoles = $4
        WHERE id::text = $5
-       RETURNING id, username, avatar, birthday, consoles`,
-      [username, avatar, birthday, JSON.stringify(consoles), userId]
+       RETURNING id, username, display_name, avatar, birthday, consoles`,
+      [displayName, avatar, birthday, JSON.stringify(consoles), userId]
     );
 
     const updated = updateRes.rows[0];
-    const newToken = createToken({ id: updated.id, username: updated.username });
 
     res.json({
-      token: newToken,
       profile: {
         id: updated.id,
-        username: updated.username,
+        loginUsername: updated.username,
+        username: (updated.display_name || '').trim() || updated.username,
         avatar: updated.avatar || '',
         birthday: updated.birthday || '',
         consoles: parseConsoles(updated.consoles)
@@ -118,7 +110,8 @@ router.post('/presence/ping', authMiddleware, async (req, res) => {
     const now = Date.now();
     await pool.query('UPDATE users SET last_seen = $1 WHERE id::text = $2', [now, String(req.user.id)]);
     const onlineRes = await pool.query(
-      'SELECT id, username FROM users WHERE last_seen >= $1 ORDER BY username ASC',
+      `SELECT id, COALESCE(NULLIF(display_name, ''), username) AS username
+       FROM users WHERE last_seen >= $1 ORDER BY username ASC`,
       [now - ONLINE_WINDOW_MS]
     );
     res.json({
@@ -136,7 +129,7 @@ router.get('/ranking', authMiddleware, async (req, res) => {
     const result = await pool.query(`
       SELECT 
         u.id,
-        u.username,
+        COALESCE(NULLIF(u.display_name, ''), u.username) AS username,
         u.avatar,
         u.consoles,
         u.last_seen,
@@ -151,8 +144,8 @@ router.get('/ranking', authMiddleware, async (req, res) => {
         ) AS current_game
       FROM users u
       LEFT JOIN games g ON g.user_id::text = u.id::text
-      GROUP BY u.id, u.username, u.avatar, u.consoles, u.last_seen
-      ORDER BY total_hours DESC, platinums DESC, completed DESC, total_games DESC, u.username ASC
+      GROUP BY u.id, u.username, u.display_name, u.avatar, u.consoles, u.last_seen
+      ORDER BY total_hours DESC, platinums DESC, completed DESC, total_games DESC, username ASC
     `);
     res.json(result.rows.map(r => ({
       ...r,
@@ -172,7 +165,9 @@ router.get('/users/:id/profile', authMiddleware, async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'ID inválido' });
 
     const userRes = await pool.query(
-      'SELECT id, username, avatar, birthday, consoles, created_at, last_seen FROM users WHERE id::text = $1',
+      `SELECT id, COALESCE(NULLIF(display_name, ''), username) AS username,
+              avatar, birthday, consoles, created_at, last_seen
+       FROM users WHERE id::text = $1`,
       [userId]
     );
     const user = userRes.rows[0];
@@ -216,14 +211,16 @@ router.get('/posts', authMiddleware, async (req, res) => {
   try {
     const [postsRes, commentsRes, reactionsRes] = await Promise.all([
       pool.query(`
-        SELECT p.id, p.user_id, u.username, u.avatar, u.last_seen, p.title, p.content, p.category, p.color, p.created_at
+        SELECT p.id, p.user_id, COALESCE(NULLIF(u.display_name, ''), u.username) AS username,
+               u.avatar, u.last_seen, p.title, p.content, p.category, p.color, p.created_at
         FROM community_posts p
         JOIN users u ON u.id::text = p.user_id::text
         ORDER BY p.created_at DESC
         LIMIT 60
       `),
       pool.query(`
-        SELECT c.id, c.post_id, c.user_id, u.username, u.last_seen, c.content, c.created_at
+        SELECT c.id, c.post_id, c.user_id, COALESCE(NULLIF(u.display_name, ''), u.username) AS username,
+               u.last_seen, c.content, c.created_at
         FROM post_comments c
         JOIN users u ON u.id::text = c.user_id::text
         ORDER BY c.created_at ASC
@@ -292,6 +289,12 @@ router.post('/posts', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Preencha o título e a mensagem da publicação.' });
     }
 
+    const userRes = await pool.query(
+      `SELECT COALESCE(NULLIF(display_name, ''), username) AS display FROM users WHERE id::text = $1`,
+      [String(req.user.id)]
+    );
+    const authorName = userRes.rows[0]?.display || req.user.username;
+
     const id = genId();
     const createdAt = Date.now();
     await pool.query(
@@ -303,7 +306,7 @@ router.post('/posts', authMiddleware, async (req, res) => {
     res.status(201).json({
       id,
       userId: req.user.id,
-      username: req.user.username,
+      username: authorName,
       online: true,
       title: title.slice(0, 120),
       content: content.slice(0, 2000),
@@ -371,6 +374,12 @@ router.post('/posts/:id/comments', authMiddleware, async (req, res) => {
     const content = String(req.body.content || '').trim();
     if (!content) return res.status(400).json({ error: 'Escreva um comentário.' });
 
+    const userRes = await pool.query(
+      `SELECT COALESCE(NULLIF(display_name, ''), username) AS display FROM users WHERE id::text = $1`,
+      [String(req.user.id)]
+    );
+    const authorName = userRes.rows[0]?.display || req.user.username;
+
     const id = genId();
     const createdAt = Date.now();
     await pool.query(
@@ -383,7 +392,7 @@ router.post('/posts/:id/comments', authMiddleware, async (req, res) => {
       id,
       postId: req.params.id,
       userId: req.user.id,
-      username: req.user.username,
+      username: authorName,
       online: true,
       content: content.slice(0, 600),
       createdAt
@@ -413,7 +422,8 @@ router.get('/chat', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT * FROM (
-        SELECT m.id, m.user_id, u.username, u.avatar, u.last_seen, m.message, m.created_at
+        SELECT m.id, m.user_id, COALESCE(NULLIF(u.display_name, ''), u.username) AS username,
+               u.avatar, u.last_seen, m.message, m.created_at
         FROM chat_messages m
         JOIN users u ON u.id::text = m.user_id::text
         ORDER BY m.created_at DESC
@@ -442,6 +452,12 @@ router.post('/chat', authMiddleware, async (req, res) => {
     const message = String(req.body.message || '').trim();
     if (!message) return res.status(400).json({ error: 'Digite uma mensagem.' });
 
+    const userRes = await pool.query(
+      `SELECT COALESCE(NULLIF(display_name, ''), username) AS display FROM users WHERE id::text = $1`,
+      [String(req.user.id)]
+    );
+    const authorName = userRes.rows[0]?.display || req.user.username;
+
     const id = genId();
     const createdAt = Date.now();
     await pool.query(
@@ -452,7 +468,7 @@ router.post('/chat', authMiddleware, async (req, res) => {
     res.status(201).json({
       id,
       userId: req.user.id,
-      username: req.user.username,
+      username: authorName,
       online: true,
       message: message.slice(0, 500),
       createdAt

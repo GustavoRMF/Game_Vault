@@ -12,6 +12,7 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       username VARCHAR(40) UNIQUE NOT NULL,
+      display_name VARCHAR(40) DEFAULT '',
       password_hash TEXT NOT NULL,
       salt TEXT,
       prefix_hash TEXT,
@@ -23,6 +24,7 @@ async function initDb() {
       created_at BIGINT NOT NULL
     );
 
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(40) DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS salt TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS prefix_hash TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS prefix_salt TEXT;
