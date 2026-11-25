@@ -481,3 +481,185 @@ body {
   gap: 8px;
   margin-bottom: 14px;
 }
+
+/* ===== Sidebar de Jogadores Online/Offline & Menções no Chat ===== */
+.chat-workspace {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.chat-users-sidebar {
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 16, 34, 0.86);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 14px;
+  padding: 10px;
+  max-height: 490px;
+}
+
+.chat-sidebar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.chat-online-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.chat-user-search {
+  width: 100%;
+  padding: 6px 10px !important;
+  font-size: 0.8rem !important;
+  margin-bottom: 8px;
+  border-radius: 9px !important;
+}
+
+.chat-users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.chat-user-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
+}
+
+.chat-user-row:hover {
+  background: rgba(30, 41, 59, 0.92);
+  border-color: rgba(56, 189, 248, 0.45);
+  transform: translateX(2px);
+}
+
+.chat-user-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.chat-status-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #0b1226;
+}
+
+.chat-status-dot.is-online {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.9);
+}
+
+.chat-status-dot.is-offline {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.65);
+}
+
+.chat-user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-user-name {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-user-name small {
+  color: #38bdf8;
+  font-weight: 500;
+}
+
+.chat-user-state {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.chat-user-row.is-online .chat-user-state {
+  color: #4ade80;
+}
+
+.chat-user-row.is-offline .chat-user-state {
+  color: #f87171;
+}
+
+.chat-mention-btn {
+  padding: 3px 7px;
+  border-radius: 7px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+  cursor: pointer;
+}
+
+.chat-mention-btn:hover {
+  background: #0284c7;
+  color: #fff;
+}
+
+.chat-main-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chat-mention-tag {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.22);
+  color: #7dd3fc;
+  font-weight: 700;
+}
+
+.chat-sidebar-empty {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 16px 6px;
+}
+
+@media (max-width: 780px) {
+  .chat-workspace {
+    grid-template-columns: 1fr;
+  }
+  .chat-users-sidebar {
+    max-height: 210px;
+  }
+}

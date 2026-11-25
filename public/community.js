@@ -3,10 +3,16 @@
 // ========================================
 
 let chatPollTimer = null;
+let chatUsersCache = [];
 const REACTION_EMOJIS = ['🔥', '🏆', '❤️', '🎮', '😂'];
 
 function onlineDotHtml(isOnline) {
   return `<span class="online-dot ${isOnline ? 'is-online' : ''}" title="${isOnline ? 'Online agora' : 'Offline'}"></span>`;
+}
+
+function formatChatMessageText(rawText) {
+  const escaped = escapeHtml(rawText || '');
+  return escaped.replace(/(^|\s)(@[^\s@.,!?;:()[\]{}]+)/g, '$1<span class="chat-mention-tag">$2</span>');
 }
 
 // Injeta seletor de cores e barra de emojis nos formulários do Mural e Chat
@@ -31,13 +37,13 @@ function initCommunityEnhancements() {
     postForm.insertBefore(extras, actionsDiv);
   }
 
-  const chatCard = document.querySelector('#tab-chat .chat-card');
+  const chatContainer = document.querySelector('#tab-chat .chat-main-pane') || document.querySelector('#tab-chat .chat-card');
   const chatForm = document.getElementById('chat-form');
-  if (chatCard && chatForm && !document.getElementById('chatEmojiBarWrap')) {
+  if (chatContainer && chatForm && !document.getElementById('chatEmojiBarWrap')) {
     const wrap = document.createElement('div');
     wrap.id = 'chatEmojiBarWrap';
     wrap.innerHTML = typeof buildEmojiBarHtml === 'function' ? buildEmojiBarHtml('chat-input') : '';
-    chatCard.insertBefore(wrap, chatForm);
+    chatContainer.insertBefore(wrap, chatForm);
   }
 
   const chatHeader = document.querySelector('#tab-chat .chat-header div');
@@ -84,8 +90,8 @@ async function openPlayerProfile(userId) {
       <div class="stat-card"><div class="value">${data.stats.completed}</div><div class="label">Zerados</div></div>
       <div class="stat-card"><div class="value">${data.stats.playing}</div><div class="label">Jogando</div></div>
     `;
-    
-const xpInfo = typeof calculatePlayerXP === 'function' ? calculatePlayerXP(data.stats) : null;
+
+    const xpInfo = typeof calculatePlayerXP === 'function' ? calculatePlayerXP(data.stats) : null;
     if (xpInfo) {
       subEl.innerHTML += ` • <strong>${xpInfo.icon} Nível ${xpInfo.level} (${xpInfo.title})</strong>`;
     }
@@ -106,6 +112,7 @@ const xpInfo = typeof calculatePlayerXP === 'function' ? calculatePlayerXP(data.
       `;
       gamesEl.parentNode.insertBefore(showcase, gamesEl);
     }
+
     if (!data.games.length) {
       gamesEl.innerHTML = '<p class="empty-msg">Este jogador ainda não cadastrou nenhum jogo.</p>';
       return;
@@ -312,6 +319,82 @@ document.getElementById('posts-list')?.addEventListener('submit', async (e) => {
 
 document.getElementById('refresh-posts-btn')?.addEventListener('click', loadCommunityPosts);
 
+// ===== Sidebar de Jogadores & Menções no Chat =====
+function renderChatUsersSidebar() {
+  const listEl = document.getElementById('chat-users-list');
+  const summaryEl = document.getElementById('chat-online-summary');
+  const searchInput = document.getElementById('chat-user-search');
+  if (!listEl) return;
+
+  const term = (searchInput?.value || '').toLowerCase().trim();
+  const onlineTotal = chatUsersCache.filter(u => u.online).length;
+  if (summaryEl) {
+    summaryEl.textContent = `${onlineTotal} online • ${chatUsersCache.length} total`;
+  }
+
+  const filtered = term
+    ? chatUsersCache.filter(u => u.username.toLowerCase().includes(term))
+    : chatUsersCache;
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="chat-sidebar-empty">Nenhum jogador encontrado.</div>';
+    return;
+  }
+
+  const avatarFn = typeof window.renderAvatarHtml === 'function' ? window.renderAvatarHtml : () => '';
+
+  listEl.innerHTML = filtered.map(u => {
+    const isMe = currentUser && String(u.id) === String(currentUser.id);
+    const statusClass = u.online ? 'is-online' : 'is-offline';
+    const statusTitle = u.online ? 'Online agora' : 'Offline';
+
+    return `
+      <div class="chat-user-row ${statusClass}" data-mention-name="${escapeHtml(u.username)}" title="Clique para marcar @${escapeHtml(u.username)}">
+        <div class="chat-user-avatar-wrap">
+          ${avatarFn(u.avatar, u.username, 32)}
+          <span class="chat-status-dot ${statusClass}" title="${statusTitle}"></span>
+        </div>
+        <div class="chat-user-meta">
+          <span class="chat-user-name">${escapeHtml(u.username)} ${isMe ? '<small>(Você)</small>' : ''}</span>
+          <span class="chat-user-state">${u.online ? 'Online' : 'Offline'}</span>
+        </div>
+        <button type="button" class="chat-mention-btn" data-mention-name="${escapeHtml(u.username)}" title="Marcar @${escapeHtml(u.username)}">@</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadChatUsers() {
+  if (!authToken) return;
+  try {
+    const res = await apiFetch('/api/chat/users');
+    if (!res.ok) return;
+    chatUsersCache = await res.json();
+    renderChatUsersSidebar();
+  } catch (err) {
+    console.error('Erro ao carregar lista de usuários do chat:', err);
+  }
+}
+
+function insertChatMention(username) {
+  const input = document.getElementById('chat-input');
+  if (!input || !username) return;
+
+  const mention = `@${username} `;
+  const current = input.value;
+  const needsSpace = current.length > 0 && !current.endsWith(' ');
+  input.value = `${current}${needsSpace ? ' ' : ''}${mention}`;
+  input.focus();
+}
+
+document.getElementById('chat-user-search')?.addEventListener('input', renderChatUsersSidebar);
+
+document.getElementById('chat-users-list')?.addEventListener('click', (e) => {
+  const row = e.target.closest('[data-mention-name]');
+  if (!row) return;
+  insertChatMention(row.dataset.mentionName);
+});
+
 // ===== Chat Global =====
 async function loadChatMessages(silent = false) {
   initCommunityEnhancements();
@@ -329,18 +412,21 @@ async function loadChatMessages(silent = false) {
       return;
     }
 
+    const avatarFn = typeof window.renderAvatarHtml === 'function' ? window.renderAvatarHtml : () => '';
+
     box.innerHTML = messages.map(m => {
       const isMe = currentUser && String(m.userId) === String(currentUser.id);
       const timeStr = new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       return `
         <div class="chat-msg ${isMe ? 'mine' : ''}">
           <div class="chat-msg-head">
+            ${avatarFn(m.avatar, m.username, 22)}
             ${onlineDotHtml(m.online)}
             <strong class="clickable-user" data-profile-id="${escapeHtml(String(m.userId))}">${escapeHtml(m.username)}</strong>
             <span>${timeStr}</span>
             ${isMe ? `<button type="button" class="btn-delete btn-small" data-del-chat="${escapeHtml(m.id)}">✕</button>` : ''}
           </div>
-          <div class="chat-msg-body">${escapeHtml(m.message)}</div>
+          <div class="chat-msg-body">${formatChatMessageText(m.message)}</div>
         </div>
       `;
     }).join('');
@@ -353,7 +439,11 @@ async function loadChatMessages(silent = false) {
 function startChatPolling() {
   stopChatPolling();
   loadChatMessages();
-  chatPollTimer = setInterval(() => loadChatMessages(true), 6000);
+  loadChatUsers();
+  chatPollTimer = setInterval(() => {
+    loadChatMessages(true);
+    loadChatUsers();
+  }, 6000);
 }
 
 function stopChatPolling() {
@@ -399,5 +489,9 @@ document.getElementById('chat-messages')?.addEventListener('click', async (e) =>
   }
 });
 
-document.getElementById('refresh-chat-btn')?.addEventListener('click', () => loadChatMessages());
+document.getElementById('refresh-chat-btn')?.addEventListener('click', () => {
+  loadChatMessages();
+  loadChatUsers();
+});
+
 document.addEventListener('DOMContentLoaded', initCommunityEnhancements);

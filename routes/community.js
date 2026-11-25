@@ -493,4 +493,31 @@ router.delete('/chat/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// ===== Lista de Jogadores do Chat (Online & Offline) =====
+router.get('/chat/users', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        id,
+        COALESCE(NULLIF(display_name, ''), username) AS username,
+        avatar,
+        last_seen
+      FROM users
+      ORDER BY
+        CASE WHEN last_seen >= $1 THEN 0 ELSE 1 END ASC,
+        username ASC
+    `, [Date.now() - ONLINE_WINDOW_MS]);
+
+    res.json(result.rows.map(u => ({
+      id: u.id,
+      username: u.username,
+      avatar: u.avatar || '',
+      online: isUserOnline(u.last_seen)
+    })));
+  } catch (err) {
+    console.error('Erro ao carregar usuários do chat:', err);
+    res.status(500).json({ error: 'Erro ao carregar lista de jogadores.' });
+  }
+});
+
 module.exports = router;

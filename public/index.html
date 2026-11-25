@@ -441,21 +441,36 @@
 
     <!-- ================= ABA 5: CHAT GLOBAL ================= -->
     <div id="tab-chat" class="tab-content hidden">
-      <section class="chat-card">
+      <section class="chat-card chat-layout-shell">
         <div class="chat-header">
           <div>
             <h2>💬 Chat da Comunidade</h2>
-            <p class="subtitle">Converse em tempo real com outros jogadores do GameVault.</p>
+            <p class="subtitle">Converse em tempo real e clique em um jogador ao lado para marcar <strong>@usuário</strong>.</p>
           </div>
           <button type="button" id="refresh-chat-btn" class="btn-secondary btn-small">🔄 Atualizar</button>
         </div>
 
-        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-workspace">
+          <!-- Coluna Esquerda: Lista de Jogadores Online / Offline -->
+          <aside class="chat-users-sidebar">
+            <div class="chat-sidebar-head">
+              <span>👥 Jogadores</span>
+              <span id="chat-online-summary" class="chat-online-count">0 online</span>
+            </div>
+            <input type="text" id="chat-user-search" class="chat-user-search" placeholder="🔍 Filtrar jogador..." autocomplete="off">
+            <div id="chat-users-list" class="chat-users-list"></div>
+          </aside>
 
-        <form id="chat-form" class="chat-form">
-          <input type="text" id="chat-input" maxlength="500" required placeholder="Digite sua mensagem..." autocomplete="off">
-          <button type="submit" class="btn-primary">Enviar</button>
-        </form>
+          <!-- Coluna Direita: Mensagens e Envio -->
+          <div class="chat-main-pane">
+            <div id="chat-messages" class="chat-messages"></div>
+
+            <form id="chat-form" class="chat-form">
+              <input type="text" id="chat-input" maxlength="500" required placeholder="Digite sua mensagem ou clique em um jogador para @marcar..." autocomplete="off">
+              <button type="submit" class="btn-primary">Enviar</button>
+            </form>
+          </div>
+        </div>
       </section>
     </div>
 <!-- ================= ABA: MEU PERFIL ================= -->
