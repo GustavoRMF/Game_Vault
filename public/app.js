@@ -831,6 +831,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
     document.getElementById(`tab-${target}`).classList.remove('hidden');
 
+    if (target === 'profile' && typeof loadMyProfile === 'function') loadMyProfile();
     if (target === 'library') renderCharts();
     if (target === 'wishlist' && typeof renderWishlist === 'function') renderWishlist();
     if (target === 'ranking') loadRanking();
@@ -1024,8 +1025,8 @@ window.addEventListener('appinstalled', () => {
   if (authToken && currentUser) {
     await loadGames();
     render();
-    if (typeof loadWishlist === 'function') {
-      await loadWishlist();
+   if (typeof loadMyProfile === 'function') {
+  await loadMyProfile();
       renderWishlist();
     }
   }

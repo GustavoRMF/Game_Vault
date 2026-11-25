@@ -101,12 +101,13 @@
 
   <!-- ===== Conteúdo Principal (Logado) ===== -->
   <main id="app-content" class="hidden">
-    <nav class="main-tabs tabs-nav">
+    ><nav class="main-tabs tabs-nav">
       <button type="button" class="tab-btn active" data-tab="library">📚 Minha Biblioteca</button>
       <button type="button" class="tab-btn" data-tab="wishlist">⭐ Lista de Desejos <span id="wishlist-tab-badge" class="tab-badge">0</span></button>
       <button type="button" class="tab-btn" data-tab="ranking">🏆 Ranking</button>
       <button type="button" class="tab-btn" data-tab="posts">📢 Mural</button>
       <button type="button" class="tab-btn" data-tab="chat">💬 Chat</button>
+      <button type="button" class="tab-btn" data-tab="profile">👤 Meu Perfil</button>
       <button type="button" class="tab-btn" data-tab="settings">⚙️ Ajustes</button>
     </nav>
 
@@ -405,6 +406,62 @@
         </form>
       </section>
     </div>
+<!-- ================= ABA: MEU PERFIL ================= -->
+    <div id="tab-profile" class="tab-content hidden">
+      <section class="form-section" style="margin-top: 0;">
+        <h2>👤 Meu Perfil Gamer</h2>
+        <p class="subtitle" style="margin-bottom: 18px;">
+          Personalize sua foto ou escolha um avatar de jogo, altere seu nome de exibição e marque seus consoles.
+        </p>
+
+        <form id="my-profile-form">
+          <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin-bottom:20px; padding:14px; background:var(--input-bg); border:1px solid var(--border); border-radius:14px;">
+            <div id="profile-avatar-preview"></div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <strong>Foto ou Avatar do Perfil</strong>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <label class="btn-secondary btn-small file-label">
+                  📷 Enviar Foto
+                  <input type="file" id="profile-photo-input" accept="image/*" hidden>
+                </label>
+                <button type="button" id="profile-clear-avatar-btn" class="btn-secondary btn-small">🗑️ Usar Inicial</button>
+              </div>
+              <span style="font-size:0.78rem; color:var(--muted);">Ou selecione um avatar de jogo abaixo:</span>
+            </div>
+          </div>
+
+          <div id="avatar-presets-grid" class="avatar-presets-grid" style="margin-bottom: 20px;"></div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="profile-username-input">Nome do Perfil *</label>
+              <input type="text" id="profile-username-input" required minlength="3" maxlength="30" placeholder="Seu nome gamer">
+            </div>
+
+            <div class="form-group">
+              <label for="profile-birthday-input">Data de Aniversário (opcional)</label>
+              <input type="date" id="profile-birthday-input">
+            </div>
+
+            <div class="form-group full-width">
+              <label>Quais consoles você possui?</label>
+              <div class="console-checkbox-grid">
+                <label class="console-chip"><input type="checkbox" name="profile-console" value="PS3"> <span>🎮 PS3</span></label>
+                <label class="console-chip"><input type="checkbox" name="profile-console" value="PS4"> <span>🎮 PS4</span></label>
+                <label class="console-chip"><input type="checkbox" name="profile-console" value="PS5"> <span>🎮 PS5</span></label>
+                <label class="console-chip"><input type="checkbox" name="profile-console" value="PC"> <span>🖥️ PC</span></label>
+                <label class="console-chip"><input type="checkbox" name="profile-console" value="Xbox"> <span>🟩 Xbox</span></label>
+                <label class="console-chip"><input type="checkbox" name="profile-console" value="Switch"> <span>🕹️ Switch</span></label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">💾 Salvar Perfil</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <!-- ================= ABA 6: AJUSTES & INTEGRAÇÕES ================= -->
     <div id="tab-settings" class="tab-content hidden">
@@ -502,6 +559,7 @@
 
   <script src="js/gamer-effects.js"></script>
   <script src="wishlist.js"></script>
+  <script src="profile.js"></script>
   <script src="community.js"></script>
   <script src="app.js"></script>
 </body>
