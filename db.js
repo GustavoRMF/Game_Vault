@@ -103,6 +103,32 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_chat_created_at ON chat_messages(created_at DESC);
   `);
 
+  // Garante que a coluna users.id sempre tenha auto-incremento/default ativo no Neon
+  await pool.query(`
+    DO $$
+    DECLARE
+      col_type TEXT;
+      col_default TEXT;
+      max_id BIGINT;
+    BEGIN
+      SELECT data_type, column_default INTO col_type, col_default
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'id';
+
+      IF col_default IS NULL THEN
+        IF col_type IN ('integer', 'bigint', 'smallint') THEN
+          CREATE SEQUENCE IF NOT EXISTS users_id_seq;
+          SELECT COALESCE(MAX(id::bigint), 0) + 1 INTO max_id FROM users;
+          PERFORM setval('users_id_seq', max_id, false);
+          ALTER TABLE users ALTER COLUMN id SET DEFAULT nextval('users_id_seq');
+          ALTER SEQUENCE users_id_seq OWNED BY users.id;
+        ELSE
+          ALTER TABLE users ALTER COLUMN id SET DEFAULT md5(random()::text || clock_timestamp()::text);
+        END IF;
+      END IF;
+    END $$;
+  `);
+
   console.log('Banco de dados Neon conectado e tabelas verificadas.');
 }
 

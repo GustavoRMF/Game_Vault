@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
-const { authMiddleware, createToken } = require('../middleware/auth');
+const { authMiddleware, createToken, genId } = require('../middleware/auth');
 const { generateBase32Secret, verifyTotp, buildOtpAuthUri } = require('../utils/totp');
 
 const router = express.Router();
@@ -35,15 +35,16 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ error: 'Este nome de usuário já está em uso.' });
     }
 
+    const id = typeof genId === 'function' ? genId() : crypto.randomBytes(12).toString('hex');
     const { hash, salt } = hashPassword(password);
     const { hash: prefixHash, salt: prefixSalt } = hashPassword(password.slice(0, 3));
     const createdAt = Date.now();
 
     const insert = await pool.query(
-      `INSERT INTO users (username, password_hash, salt, prefix_hash, prefix_salt, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO users (id, username, display_name, password_hash, salt, prefix_hash, prefix_salt, created_at, last_seen)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id, username`,
-      [username, hash, salt, prefixHash, prefixSalt, createdAt]
+      [id, username, username, hash, salt, prefixHash, prefixSalt, createdAt, createdAt]
     );
 
     const user = insert.rows[0];
@@ -51,6 +52,9 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ token, user });
   } catch (err) {
     console.error('Erro no cadastro:', err);
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Este nome de usuário já está em uso.' });
+    }
     res.status(500).json({ error: 'Erro interno ao cadastrar usuário.' });
   }
 });
@@ -124,8 +128,8 @@ router.post('/reset-password', async (req, res) => {
     const { hash: prefixHash, salt: prefixSalt } = hashPassword(newPassword.slice(0, 3));
 
     await pool.query(
-      'UPDATE users SET password_hash = $1, salt = $2, prefix_hash = $3, prefix_salt = $4 WHERE id = $5',
-      [hash, salt, prefixHash, prefixSalt, user.id]
+      'UPDATE users SET password_hash = $1, salt = $2, prefix_hash = $3, prefix_salt = $4 WHERE id::text = $5',
+      [hash, salt, prefixHash, prefixSalt, String(user.id)]
     );
 
     const token = createToken({ id: user.id, username: user.username });
@@ -139,7 +143,7 @@ router.post('/reset-password', async (req, res) => {
 // ===== Rotas de Configuração 2FA (Opcional) =====
 router.get('/2fa/status', authMiddleware, async (req, res) => {
   try {
-    const result = await pool.query('SELECT totp_enabled FROM users WHERE id = $1', [req.user.id]);
+    const result = await pool.query('SELECT totp_enabled FROM users WHERE id::text = $1', [String(req.user.id)]);
     res.json({ enabled: Boolean(result.rows[0]?.totp_enabled) });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao verificar status do 2FA.' });
@@ -149,7 +153,7 @@ router.get('/2fa/status', authMiddleware, async (req, res) => {
 router.post('/2fa/setup', authMiddleware, async (req, res) => {
   try {
     const secret = generateBase32Secret(20);
-    await pool.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secret, req.user.id]);
+    await pool.query('UPDATE users SET totp_secret = $1 WHERE id::text = $2', [secret, String(req.user.id)]);
 
     const otpauthUrl = buildOtpAuthUri({
       secret,
@@ -167,14 +171,14 @@ router.post('/2fa/setup', authMiddleware, async (req, res) => {
 router.post('/2fa/enable', authMiddleware, async (req, res) => {
   try {
     const code = String(req.body.code || '').trim();
-    const result = await pool.query('SELECT totp_secret FROM users WHERE id = $1', [req.user.id]);
+    const result = await pool.query('SELECT totp_secret FROM users WHERE id::text = $1', [String(req.user.id)]);
     const secret = result.rows[0]?.totp_secret;
 
     if (!secret || !verifyTotp(secret, code)) {
       return res.status(400).json({ error: 'Código inválido. Verifique os 6 dígitos no app autenticador.' });
     }
 
-    await pool.query('UPDATE users SET totp_enabled = TRUE WHERE id = $1', [req.user.id]);
+    await pool.query('UPDATE users SET totp_enabled = TRUE WHERE id::text = $1', [String(req.user.id)]);
     res.json({ enabled: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao ativar 2FA.' });
@@ -184,14 +188,14 @@ router.post('/2fa/enable', authMiddleware, async (req, res) => {
 router.post('/2fa/disable', authMiddleware, async (req, res) => {
   try {
     const code = String(req.body.code || '').trim();
-    const result = await pool.query('SELECT totp_secret FROM users WHERE id = $1', [req.user.id]);
+    const result = await pool.query('SELECT totp_secret FROM users WHERE id::text = $1', [String(req.user.id)]);
     const secret = result.rows[0]?.totp_secret;
 
     if (!secret || !verifyTotp(secret, code)) {
       return res.status(400).json({ error: 'Código inválido para desativar o 2FA.' });
     }
 
-    await pool.query('UPDATE users SET totp_enabled = FALSE, totp_secret = \'\' WHERE id = $1', [req.user.id]);
+    await pool.query('UPDATE users SET totp_enabled = FALSE, totp_secret = \'\' WHERE id::text = $1', [String(req.user.id)]);
     res.json({ enabled: false });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao desativar 2FA.' });
