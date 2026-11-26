@@ -14,6 +14,11 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Rota leve de healthcheck para manter o Render ativo (UptimeRobot / Cron-job.org)
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ ok: true, status: 'awake', ts: Date.now() });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api', gamesRoutes);
 app.use('/api', psnRoutes);
