@@ -206,13 +206,13 @@ router.get('/users/:id/profile', authMiddleware, async (req, res) => {
   }
 });
 
-// ===== Mural, Cores, Reações & Comentários =====
+// ===== Mural, Cores, Imagens, Reações & Comentários =====
 router.get('/posts', authMiddleware, async (req, res) => {
   try {
     const [postsRes, commentsRes, reactionsRes] = await Promise.all([
       pool.query(`
         SELECT p.id, p.user_id, COALESCE(NULLIF(u.display_name, ''), u.username) AS username,
-               u.avatar, u.last_seen, p.title, p.content, p.category, p.color, p.created_at
+               u.avatar, u.last_seen, p.title, p.content, p.category, p.color, p.image, p.created_at
         FROM community_posts p
         JOIN users u ON u.id::text = p.user_id::text
         ORDER BY p.created_at DESC
@@ -265,6 +265,7 @@ router.get('/posts', authMiddleware, async (req, res) => {
       content: p.content,
       category: p.category || 'Geral',
       color: p.color || 'blue',
+      image: p.image || '',
       createdAt: Number(p.created_at),
       reactions: reactionsByPost[p.id] || {},
       comments: commentsByPost[p.id] || []
@@ -284,9 +285,13 @@ router.post('/posts', authMiddleware, async (req, res) => {
     const category = String(req.body.category || 'Geral').trim().slice(0, 40);
     const allowedColors = ['blue', 'purple', 'emerald', 'gold', 'crimson', 'cyan'];
     const color = allowedColors.includes(req.body.color) ? req.body.color : 'blue';
+    const image = String(req.body.image || '').trim();
 
-    if (!title || !content) {
-      return res.status(400).json({ error: 'Preencha o título e a mensagem da publicação.' });
+    if (!title || (!content && !image)) {
+      return res.status(400).json({ error: 'Preencha o título e a mensagem ou anexe uma imagem.' });
+    }
+    if (image.length > 480000) {
+      return res.status(400).json({ error: 'A imagem é muito grande. Escolha uma menor.' });
     }
 
     const userRes = await pool.query(
@@ -298,9 +303,9 @@ router.post('/posts', authMiddleware, async (req, res) => {
     const id = genId();
     const createdAt = Date.now();
     await pool.query(
-      `INSERT INTO community_posts (id, user_id, title, content, category, color, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, String(req.user.id), title.slice(0, 120), content.slice(0, 2000), category, color, createdAt]
+      `INSERT INTO community_posts (id, user_id, title, content, category, color, image, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, String(req.user.id), title.slice(0, 120), content.slice(0, 2000), category, color, image, createdAt]
     );
 
     res.status(201).json({
@@ -312,6 +317,7 @@ router.post('/posts', authMiddleware, async (req, res) => {
       content: content.slice(0, 2000),
       category,
       color,
+      image,
       createdAt,
       reactions: {},
       comments: []
@@ -417,13 +423,13 @@ router.delete('/comments/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ===== Chat Global =====
+// ===== Chat Global (Mensagens & Fotos) =====
 router.get('/chat', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT * FROM (
         SELECT m.id, m.user_id, COALESCE(NULLIF(u.display_name, ''), u.username) AS username,
-               u.avatar, u.last_seen, m.message, m.created_at
+               u.avatar, u.last_seen, m.message, m.image, m.created_at
         FROM chat_messages m
         JOIN users u ON u.id::text = m.user_id::text
         ORDER BY m.created_at DESC
@@ -439,6 +445,7 @@ router.get('/chat', authMiddleware, async (req, res) => {
       avatar: r.avatar || '',
       online: isUserOnline(r.last_seen),
       message: r.message,
+      image: r.image || '',
       createdAt: Number(r.created_at)
     })));
   } catch (err) {
@@ -450,7 +457,14 @@ router.get('/chat', authMiddleware, async (req, res) => {
 router.post('/chat', authMiddleware, async (req, res) => {
   try {
     const message = String(req.body.message || '').trim();
-    if (!message) return res.status(400).json({ error: 'Digite uma mensagem.' });
+    const image = String(req.body.image || '').trim();
+
+    if (!message && !image) {
+      return res.status(400).json({ error: 'Digite uma mensagem ou selecione uma foto.' });
+    }
+    if (image.length > 480000) {
+      return res.status(400).json({ error: 'A foto é muito grande. Tente outra imagem.' });
+    }
 
     const userRes = await pool.query(
       `SELECT COALESCE(NULLIF(display_name, ''), username) AS display FROM users WHERE id::text = $1`,
@@ -461,8 +475,8 @@ router.post('/chat', authMiddleware, async (req, res) => {
     const id = genId();
     const createdAt = Date.now();
     await pool.query(
-      'INSERT INTO chat_messages (id, user_id, message, created_at) VALUES ($1, $2, $3, $4)',
-      [id, String(req.user.id), message.slice(0, 500), createdAt]
+      'INSERT INTO chat_messages (id, user_id, message, image, created_at) VALUES ($1, $2, $3, $4, $5)',
+      [id, String(req.user.id), message.slice(0, 500), image, createdAt]
     );
 
     res.status(201).json({
@@ -471,6 +485,7 @@ router.post('/chat', authMiddleware, async (req, res) => {
       username: authorName,
       online: true,
       message: message.slice(0, 500),
+      image,
       createdAt
     });
   } catch (err) {

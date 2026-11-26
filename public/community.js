@@ -1,9 +1,11 @@
 // ========================================
-// GameVault - Perfil Público, Mural (Cores/Emojis/Reações) & Chat Online
+// GameVault - Perfil Público, Mural (Cores/Imagens/Emojis/Reações) & Chat Online
 // ========================================
 
 let chatPollTimer = null;
 let chatUsersCache = [];
+let pendingPostImage = '';
+let pendingChatImage = '';
 const REACTION_EMOJIS = ['🔥', '🏆', '❤️', '🎮', '😂'];
 
 function onlineDotHtml(isOnline) {
@@ -14,6 +16,111 @@ function formatChatMessageText(rawText) {
   const escaped = escapeHtml(rawText || '');
   return escaped.replace(/(^|\s)(@[^\s@.,!?;:()[\]{}]+)/g, '$1<span class="chat-mention-tag">$2</span>');
 }
+
+function sanitizeMediaSrc(src) {
+  if (!src || typeof src !== 'string') return '';
+  if (src.startsWith('data:image/')) return src;
+  return sanitizeUrl(src);
+}
+
+function compressImageFile(file, maxDimension = 960, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      reject(new Error('Selecione um arquivo de imagem válido.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width >= height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
+      img.src = ev.target.result;
+    };
+    reader.onerror = () => reject(new Error('Falha ao abrir arquivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function openImageLightbox(src) {
+  const safe = sanitizeMediaSrc(src);
+  const modal = document.getElementById('image-lightbox-modal');
+  const fullImg = document.getElementById('lightbox-full-img');
+  if (!safe || !modal || !fullImg) return;
+  fullImg.src = safe;
+  modal.classList.remove('hidden');
+}
+
+document.getElementById('close-lightbox-btn')?.addEventListener('click', () => {
+  document.getElementById('image-lightbox-modal')?.classList.add('hidden');
+});
+
+document.getElementById('image-lightbox-modal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'image-lightbox-modal') e.currentTarget.classList.add('hidden');
+});
+
+// ===== Seleção e Prévia de Fotos (Mural & Chat) =====
+function clearPostImageAttachment() {
+  pendingPostImage = '';
+  const prev = document.getElementById('post-image-preview');
+  if (prev) prev.src = '';
+  document.getElementById('post-image-preview-box')?.classList.add('hidden');
+  document.getElementById('post-clear-image-btn')?.classList.add('hidden');
+}
+
+document.getElementById('post-image-input')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    pendingPostImage = await compressImageFile(file, 960, 0.82);
+    document.getElementById('post-image-preview').src = pendingPostImage;
+    document.getElementById('post-image-preview-box')?.classList.remove('hidden');
+    document.getElementById('post-clear-image-btn')?.classList.remove('hidden');
+  } catch (err) {
+    showToast(err.message);
+  }
+  e.target.value = '';
+});
+
+document.getElementById('post-clear-image-btn')?.addEventListener('click', clearPostImageAttachment);
+
+function clearChatImageAttachment() {
+  pendingChatImage = '';
+  const prev = document.getElementById('chat-image-preview');
+  if (prev) prev.src = '';
+  document.getElementById('chat-image-preview-box')?.classList.add('hidden');
+}
+
+document.getElementById('chat-image-input')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    pendingChatImage = await compressImageFile(file, 820, 0.8);
+    document.getElementById('chat-image-preview').src = pendingChatImage;
+    document.getElementById('chat-image-preview-box')?.classList.remove('hidden');
+  } catch (err) {
+    showToast(err.message);
+  }
+  e.target.value = '';
+});
+
+document.getElementById('chat-clear-image-btn')?.addEventListener('click', clearChatImageAttachment);
 
 // Injeta seletor de cores e barra de emojis nos formulários do Mural e Chat
 function initCommunityEnhancements() {
@@ -38,12 +145,13 @@ function initCommunityEnhancements() {
   }
 
   const chatContainer = document.querySelector('#tab-chat .chat-main-pane') || document.querySelector('#tab-chat .chat-card');
+  const chatPreview = document.getElementById('chat-image-preview-box');
   const chatForm = document.getElementById('chat-form');
   if (chatContainer && chatForm && !document.getElementById('chatEmojiBarWrap')) {
     const wrap = document.createElement('div');
     wrap.id = 'chatEmojiBarWrap';
     wrap.innerHTML = typeof buildEmojiBarHtml === 'function' ? buildEmojiBarHtml('chat-input') : '';
-    chatContainer.insertBefore(wrap, chatForm);
+    chatContainer.insertBefore(wrap, chatPreview || chatForm);
   }
 
   const chatHeader = document.querySelector('#tab-chat .chat-header div');
@@ -174,6 +282,7 @@ async function loadCommunityPosts() {
       const isOwner = currentUser && String(post.userId) === String(currentUser.id);
       const dateStr = new Date(post.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
       const themeClass = `theme-${escapeHtml(post.color || 'blue')}`;
+      const safePostImg = sanitizeMediaSrc(post.image);
 
       const reactionsHtml = REACTION_EMOJIS.map(emoji => {
         const info = post.reactions?.[emoji] || { count: 0, reacted: false };
@@ -211,7 +320,8 @@ async function loadCommunityPosts() {
             </div>
             ${isOwner ? `<button type="button" class="btn-delete btn-small" data-del-post="${escapeHtml(post.id)}">🗑️ Excluir</button>` : ''}
           </div>
-          <p class="post-body">${escapeHtml(post.content)}</p>
+          ${post.content ? `<p class="post-body">${escapeHtml(post.content)}</p>` : ''}
+          ${safePostImg ? `<img class="post-attached-img" src="${safePostImg}" alt="Foto da publicação" data-zoom-img="${safePostImg}" loading="lazy">` : ''}
           <div class="post-reactions">${reactionsHtml}</div>
           <div class="post-comments">
             ${commentsHtml}
@@ -234,7 +344,10 @@ document.getElementById('post-form')?.addEventListener('submit', async (e) => {
   const category = document.getElementById('post-category').value;
   const content = document.getElementById('post-content').value.trim();
   const color = document.getElementById('postColorInput')?.value || 'blue';
-  if (!title || !content) return;
+  if (!title || (!content && !pendingPostImage)) {
+    showToast('Preencha o título e uma mensagem ou selecione uma foto.');
+    return;
+  }
 
   const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true;
@@ -242,11 +355,12 @@ document.getElementById('post-form')?.addEventListener('submit', async (e) => {
     const res = await apiFetch('/api/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, category, content, color })
+      body: JSON.stringify({ title, category, content, color, image: pendingPostImage })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Erro ao publicar');
     e.target.reset();
+    clearPostImageAttachment();
     if (document.getElementById('postColorInput')) document.getElementById('postColorInput').value = 'blue';
     await loadCommunityPosts();
     showToast('Publicado no mural!');
@@ -258,6 +372,12 @@ document.getElementById('post-form')?.addEventListener('submit', async (e) => {
 });
 
 document.getElementById('posts-list')?.addEventListener('click', async (e) => {
+  const zoomTrigger = e.target.closest('[data-zoom-img]');
+  if (zoomTrigger) {
+    openImageLightbox(zoomTrigger.dataset.zoomImg);
+    return;
+  }
+
   const reactBtn = e.target.closest('[data-react-post]');
   if (reactBtn) {
     const postId = reactBtn.dataset.reactPost;
@@ -417,6 +537,8 @@ async function loadChatMessages(silent = false) {
     box.innerHTML = messages.map(m => {
       const isMe = currentUser && String(m.userId) === String(currentUser.id);
       const timeStr = new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const safeChatImg = sanitizeMediaSrc(m.image);
+
       return `
         <div class="chat-msg ${isMe ? 'mine' : ''}">
           <div class="chat-msg-head">
@@ -426,7 +548,8 @@ async function loadChatMessages(silent = false) {
             <span>${timeStr}</span>
             ${isMe ? `<button type="button" class="btn-delete btn-small" data-del-chat="${escapeHtml(m.id)}">✕</button>` : ''}
           </div>
-          <div class="chat-msg-body">${formatChatMessageText(m.message)}</div>
+          ${m.message ? `<div class="chat-msg-body">${formatChatMessageText(m.message)}</div>` : ''}
+          ${safeChatImg ? `<img class="chat-attached-img" src="${safeChatImg}" alt="Foto enviada no chat" data-zoom-img="${safeChatImg}" loading="lazy">` : ''}
         </div>
       `;
     }).join('');
@@ -457,19 +580,22 @@ document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const input = document.getElementById('chat-input');
   const message = input.value.trim();
-  if (!message) return;
+  if (!message && !pendingChatImage) return;
 
   input.disabled = true;
   try {
     const res = await apiFetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
+      body: JSON.stringify({ message, image: pendingChatImage })
     });
-    if (res.ok) {
-      input.value = '';
-      await loadChatMessages(true);
-    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro ao enviar');
+    input.value = '';
+    clearChatImageAttachment();
+    await loadChatMessages(true);
+  } catch (err) {
+    if (err.message !== 'Sessão expirada') showToast(err.message);
   } finally {
     input.disabled = false;
     input.focus();
@@ -477,6 +603,11 @@ document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
 });
 
 document.getElementById('chat-messages')?.addEventListener('click', async (e) => {
+  const zoomTrigger = e.target.closest('[data-zoom-img]');
+  if (zoomTrigger) {
+    openImageLightbox(zoomTrigger.dataset.zoomImg);
+    return;
+  }
   const profileTrigger = e.target.closest('[data-profile-id]');
   if (profileTrigger) {
     openPlayerProfile(profileTrigger.dataset.profileId);

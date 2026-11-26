@@ -663,3 +663,90 @@ body {
     max-height: 210px;
   }
 }
+/* ===== Imagens & Lightbox no Mural e Chat ===== */
+.media-preview-box {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.media-preview-box img {
+  max-width: 240px;
+  max-height: 160px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+}
+
+.media-preview-box.compact {
+  margin: 0 0 8px 0;
+}
+
+.media-preview-box.compact img {
+  max-width: 150px;
+  max-height: 110px;
+}
+
+.chat-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 13px;
+  font-size: 1.15rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.post-attached-img {
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  max-height: 380px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin: 10px 0 12px 0;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  cursor: zoom-in;
+  transition: transform 0.18s ease, box-shadow 0.2s ease;
+}
+
+.post-attached-img:hover,
+.chat-attached-img:hover {
+  transform: scale(1.01);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.65);
+}
+
+.chat-attached-img {
+  display: block;
+  max-width: 280px;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-top: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  cursor: zoom-in;
+}
+
+.lightbox-shell {
+  position: relative;
+  max-width: 92vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.lightbox-shell img {
+  max-width: 92vw;
+  max-height: 82vh;
+  border-radius: 14px;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
+}
